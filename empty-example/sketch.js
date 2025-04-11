@@ -553,7 +553,7 @@ function generatePixelParticlesFromVector() {
   }
 }
 
-// drawF, drawA1, drawN 등은 drawF(pg), drawA1(pg)처럼 변경 필요 (pg.beginShape 등 사용)
+//drawF, drawA1, drawN 등dpj drawF(pg), drawA1(pg)처럼 변경 필요 (pg.beginShape 등 사용)
 function drawF() {
   fill(logoStyles[currentStyleIndex].textColors[0]);
   push();
