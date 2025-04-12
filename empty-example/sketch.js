@@ -24,10 +24,12 @@ let burstBubbles = [];
 let hasBurst = false;
 let pixelParticles = [];
 let hasGeneratedPixels = false;
+let pixelCycleTimer = 0;
+let pixelCycleInterval = 130; // 약 5초 주기 (60프레임 기준)
 
 function preload() {
-  bottleImage = loadImage("/src/img/bottle.png");
-  customFont = loadFont("/src/fonts/5fe150c1ede1675dbf2d62bed5163f1e.woff");
+  bottleImage = loadImage("../src/img/bottle.png");
+  customFont = loadFont("../src/fonts/5fe150c1ede1675dbf2d62bed5163f1e.woff");
 }
 
 function setup() {
@@ -193,16 +195,44 @@ function draw() {
 
   const groupY = height * 0.4;
 
-  // ✅ 정가운데 정렬 (동적 계산)
+  // ✅ 중심 정렬 및 스케일 적용
   push();
   translate(width / 2, groupY);
   const baseScale = min(width, height) / 1000;
   scale(baseScale * (currentStyleIndex === 0 ? 1.2 * logoScale : 1.2));
 
-  const logoWidth = 349; // shape 최대 x 값 기준
+  const logoWidth = 349;
   translate(-logoWidth / 2, -100);
   drawLogo(groupY);
   pop();
+
+  // ✅ 픽셀 입자는 여기서만 렌더링!
+  if (currentStyleIndex === 1) {
+    if (!hasGeneratedPixels) {
+      generatePixelParticlesFromVector();
+      hasGeneratedPixels = true;
+    }
+
+    push();
+    for (let p of pixelParticles) {
+      p.update();
+      p.display();
+    }
+    pop();
+
+    // 주기적으로 입자 폭발
+    if (frameCount - pixelCycleTimer > pixelCycleInterval) {
+      for (let p of pixelParticles) {
+        if (p.state === "waiting") {
+          p.vx = random(-4, 4); // ✅ 좌우로 더 넓게 퍼짐
+          p.vy = random(-6, -2); // 그대로 유지
+          p.state = "exploding";
+        }
+      }
+      pixelCycleTimer = frameCount;
+    }
+
+  }
 
   inputContainer.position((width - 1160) / 2, height * 0.7);
 
@@ -226,7 +256,7 @@ function draw() {
 
     resetBtn.position(width / 2 - 60, height * 0.95);
   }
-
+  // ❗ 여기부터는 버블 로직은 항상 실행됨 ✅
   if (frameCount % 4 === 0 && mouseInsideCanvas && !mouseIsPressed) {
     bubbles.push(new Bubble(mouseX, mouseY));
   }
@@ -247,8 +277,10 @@ function draw() {
 }
 
 function drawLogo(groupY) {
+  // 로고가 폭발했으면 기본 스타일은 그리지 않음
   if (currentStyleIndex === 0 && exploded) return;
 
+  // 외곽선 있는 경우만 stroke 설정
   if (logoStyles[currentStyleIndex].stroke) {
     stroke(logoStyles[currentStyleIndex].stroke);
     strokeWeight(4);
@@ -256,6 +288,7 @@ function drawLogo(groupY) {
     noStroke();
   }
 
+  // 로고 바탕 쉐입
   fill(255);
   beginShape();
   vertex(0, 22.63);
@@ -275,36 +308,18 @@ function drawLogo(groupY) {
   vertex(14.92, 142.6);
   endShape(CLOSE);
 
+  // ▶️ 1번 스타일은 픽셀 입자 효과!
   if (currentStyleIndex === 1) {
+    // 입자 미리 생성 안 됐으면 생성
     if (!hasGeneratedPixels) {
-      generatePixelParticlesFromVector(); // 입자만 뽑고
+      generatePixelParticlesFromVector();
       hasGeneratedPixels = true;
     }
-
-    // ✅ 입자만 그려줌 (pgForVector는 쓰지 않음)
-    for (let p of pixelParticles) {
-      p.update();
-      p.display();
-    }
-
-    // ✅ 로고 텍스트도 반드시 그려야 함
-    noStroke();
-    push();
-    translate(15, 25);
-    drawF();
-    push();
-    translate(-2, 0);
-    drawA1();
-    drawN();
-    drawT();
-    drawA2();
-    pop();
-    pop();
 
     return;
   }
 
-  // ✅ 일반 스타일에도 동일하게 텍스트 렌더링
+  // ✅ 일반 스타일은 텍스트만 렌더링
   noStroke();
   push();
   translate(15, 25);
@@ -353,24 +368,33 @@ function createBurstBubbles() {
 function generatePixelParticlesFromVector() {
   pixelParticles = [];
 
-  const pg = createGraphics(400, 200);
+  // 화면 전체 크기와 동일한 그래픽 버퍼 생성
+  const pg = createGraphics(width, height);
   pg.pixelDensity(1);
   pg.background(255);
 
-  pg.push();
-  pg.translate(0, 0);
-  drawLogoVector(pg); // ✨ 벡터 로고를 pGraphics에 그림
+  // ✅ 로고 위치 보정용 transform 추가
+  const groupY = height * 0.4;
+  const baseScale = min(width, height) / 1000;
+  const scaleFactor = baseScale * 1.2;
+  const logoWidth = 349;
+
+  pg.push(); // pg 내부 transform
+  pg.translate(width / 2, groupY);
+  pg.scale(scaleFactor);
+  pg.translate(-logoWidth / 2, -100);
+
+  drawLogoVector(pg); // ✅ 이걸 transform 이후에 호출
   pg.pop();
 
   pg.loadPixels();
+
   for (let x = 0; x < pg.width; x += 3) {
     for (let y = 0; y < pg.height; y += 3) {
-      const i = 4 * (y * pg.width + x);
-      const r = pg.pixels[i];
+      const idx = 4 * (x + y * pg.width);
+      const r = pg.pixels[idx];
       if (r < 200) {
-        const px = x + width / 2 - pg.width / 2;
-        const py = height * 0.4 - pg.height / 2 + y;
-        pixelParticles.push(new PixelParticle(px, py));
+        pixelParticles.push(new PixelParticle(x, y));
       }
     }
   }
@@ -408,42 +432,42 @@ class BurstBubble {
 
 class PixelParticle {
   constructor(x, y) {
-    this.originalX = x;
-    this.originalY = y;
-
-    // 안전한 초기값 (updatePosition은 drawLogo 끝나고 호출되므로 여기선 skip)
     this.x = x;
     this.y = y;
+    this.originX = x;
+    this.originY = y;
+
     this.vx = random(-0.5, 0.5);
     this.vy = random(0, 0.5);
     this.alpha = 255;
+
     this.age = 0;
-    this.exploded = false;
-  }
-
-  updatePosition() {
-    if (width === 0 || height === 0) return; // 안전장치
-
-    const groupY = height * 0.4;
-    const globalOffsetX = width * 0.5 - 200 + 15;
-    const globalOffsetY = groupY - 100 + 25;
-    const scaleFactor = (Math.min(width, height) / 1000) * 1.2;
-
-    this.baseX = this.originalX * scaleFactor + globalOffsetX;
-    this.baseY = this.originalY * scaleFactor + globalOffsetY;
-
-    this.x = this.baseX;
-    this.y = this.baseY;
+    this.state = "waiting"; // "waiting", "exploding", "rebuilding"
   }
 
   update() {
     this.age++;
-    if (this.age > 60) this.exploded = true;
-    if (this.exploded) {
+
+    if (this.state === "exploding") {
       this.x += this.vx;
       this.y += this.vy;
-      this.vy += 0.05;
+      this.vy += 0.1; // ✅ 중력 세게: 0.05 → 0.15
       this.alpha -= 2;
+      if (this.alpha <= 0) {
+        this.alpha = 0;
+        this.state = "rebuilding";
+      }
+    } else if (this.state === "rebuilding") {
+      this.x = lerp(this.x, this.originX, 0.03); // 0.1 → 0.03
+      this.y = lerp(this.y, this.originY, 0.03);
+      this.alpha = lerp(this.alpha, 255, 0.1);
+
+      if (dist(this.x, this.y, this.originX, this.originY) < 0.5) {
+        this.x = this.originX;
+        this.y = this.originY;
+        this.alpha = 255;
+        this.state = "waiting";
+      }
     }
   }
 
@@ -456,6 +480,12 @@ class PixelParticle {
 
 function drawLogoVector(pg) {
   pg.noStroke();
+
+  // 🔁 drawLogo와 동일한 위치, 크기 transform 적용
+
+  pg.push();
+
+  pg.translate(-12, 8); // 로고 중심 정렬 보정
 
   // 로고 바탕
   pg.fill(255);
@@ -477,32 +507,18 @@ function drawLogoVector(pg) {
   pg.vertex(14.92, 142.6);
   pg.endShape(CLOSE);
 
-  // 글자 그룹 위치
+  // 텍스트
   pg.push();
-  pg.translate(15, 25);
 
-  pg.push();
-  pg.translate(0, 0);
+  pg.translate(18, 13);
   drawFVector(pg);
-  pg.pop();
-
-  pg.push();
-  pg.translate(60, 0); // ✅ A1 위치
+  pg.translate(59, 13);
   drawA1Vector(pg);
-  pg.pop();
-
-  pg.push();
-  pg.translate(130, -7); // ✅ N 위치
+  pg.translate(70, -19);
   drawNVector(pg);
-  pg.pop();
-
-  pg.push();
-  pg.translate(215, -7); // ✅ T 위치
+  pg.translate(83, 0);
   drawTVector(pg);
-  pg.pop();
-
-  pg.push();
-  pg.translate(280, 3); // ✅ A2 위치
+  pg.translate(65, 30);
   drawA2Vector(pg);
   pg.pop();
 
@@ -511,46 +527,6 @@ function drawLogoVector(pg) {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  if (pixelParticles.length > 0) {
-    for (let p of pixelParticles) {
-      p.updatePosition();
-    }
-  }
-}
-
-function generatePixelParticlesFromVector() {
-  pixelParticles = [];
-
-  // 임시 오프스크린 그래픽
-  let pg = createGraphics(width, height);
-  pg.pixelDensity(1);
-  pg.background(255);
-
-  // draw()의 변환과 동일하게 적용
-  const baseScale = min(width, height) / 1000;
-  const scaleFactor = baseScale * 1.2;
-  const groupY = height * 0.4;
-
-  pg.push();
-  pg.translate(width / 2, groupY);
-  pg.scale(scaleFactor);
-  pg.translate(-349 / 2, -100);
-  drawLogoVector(pg); // 실제 로고 그리기
-  pg.pop();
-
-  pg.loadPixels();
-
-  // 픽셀을 기준으로 입자 생성
-  for (let x = 0; x < pg.width; x += 3) {
-    for (let y = 0; y < pg.height; y += 3) {
-      const idx = 4 * (x + y * pg.width);
-      const r = pg.pixels[idx];
-
-      if (r < 200) {
-        pixelParticles.push(new PixelParticle(x, y));
-      }
-    }
-  }
 }
 
 //drawF, drawA1, drawN 등dpj drawF(pg), drawA1(pg)처럼 변경 필요 (pg.beginShape 등 사용)
