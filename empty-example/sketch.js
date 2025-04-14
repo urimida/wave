@@ -26,14 +26,42 @@ let pixelParticles = [];
 let hasGeneratedPixels = false;
 let pixelCycleTimer = 0;
 let pixelCycleInterval = 130; // 약 5초 주기 (60프레임 기준)
+let stickers = []; // 로고 스티커들
+let fallingDelay = 120; // 2초를 60프레임 기준으로 설정 (120프레임)
+let totalStickers = 200; // 총 스티커 수
+let stickerDelay = 2; // 각 스티커가 생성되는 시간 간격 (프레임 기준)
+let nextStickerTime = 0; // 다음 스티커가 생성될 시간
+let allStickersCreated = false; // 모든 스티커가 생성되었는지 확인하는 변수
+let stickerInterval = 1; // 스티커들 생성 간격 (초)
+let stickerStartTime = 0; // 첫 번째 스티커가 생성되는 시간
+let particles = [];
+let tetrisCols = 10;
+let tetrisRows = 20;
+let tetrisCellSize;
+let tetrisX, tetrisY;
+let tetrisBoard = [];
+let tetrisColors = [];
+let currentPiece;
+let tetrisFrame = 0;
+let tetrisDropSpeed = 30; // 30 프레임마다 한 칸
+let popSound;
+let shakeOffsetX = 0;
+let shakeOffsetY = 0;
+let shakeTimer = 0;
+let wallParticles = [];
+let pixelExploded = false;
+let pixelExplosionTriggeredAt = 0;
+let marbles = []; // 구슬들 배열
+let marbleRadius = 8; // 구슬 크기
 
 function preload() {
   bottleImage = loadImage("../src/img/bottle.png");
   customFont = loadFont("../src/fonts/5fe150c1ede1675dbf2d62bed5163f1e.woff");
+  soundFormats("mp3", "wav");
+  popSound = loadSound("../src/sound/pop.mp3"); // 사운드 파일 경로
 }
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
   textAlign(CENTER, CENTER);
   canvas = createCanvas(windowWidth, windowHeight);
   canvas.mouseOver(() => (mouseInsideCanvas = true));
@@ -102,7 +130,7 @@ function setup() {
     .style("box-shadow", "0px 4px 10px 3px rgba(0, 0, 0, 0.10)")
     .style("padding", "0 20px");
 
-  const iconImg = createImg("/src/img/SearchImg.svg", "search icon");
+  const iconImg = createImg("../src/img/SearchImg.svg", "search icon");
   iconImg
     .style("width", "20px")
     .style("height", "20px")
@@ -124,14 +152,74 @@ function setup() {
   resetBtn
     .style("position", "absolute")
     .style("opacity", "0")
-    .style("pointer-events", "none");
+    .style("pointer-events", "none")
+    .style("background", "#fff")
+    .style("border", "1px solid #ccc")
+    .style("padding", "8px 16px")
+    .style("font-size", "16px")
+    .style("border-radius", "10px")
+    .style("cursor", "pointer");
+
+  resetBtn.mouseOver(() => resetBtn.style("background", "#f0f0f0"));
+  resetBtn.mouseOut(() => resetBtn.style("background", "#fff"));
   resetBtn.hide();
   resetBtn.mousePressed(reset);
 }
 
 function draw() {
+  // 색상 초기화 (스타일 전환 시마다 갱신)
+  flavorColors = logoStyles[currentStyleIndex].bubbles.map((c) => color(c));
+
   background(logoStyles[currentStyleIndex].bg);
 
+  // 🎈 (1) 버블 생성 - 항상 실행
+  if (frameCount % 3 === 0) {
+    for (let i = 0; i < 3; i++) {
+      const randX = random(width);
+      const randY = random(height * 0.9);
+      bubbles.push(new Bubble(randX, randY, true));
+    }
+  }
+  if (frameCount % 2 === 0 && mouseInsideCanvas) {
+    for (let i = 0; i < 2; i++) {
+      const offsetX = random(-15, 15);
+      const offsetY = random(-15, 15);
+      bubbles.push(new Bubble(mouseX + offsetX, mouseY + offsetY));
+    }
+  }
+
+  // 🫧 (2) 버블 표시 - 병보다 먼저
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    bubbles[i].update();
+    bubbles[i].display();
+    if (bubbles[i].isDead()) {
+      bubbles.splice(i, 1);
+    }
+  }
+
+  // 🌠 (3) 벽 파티클
+  for (let i = wallParticles.length - 1; i >= 0; i--) {
+    wallParticles[i].update();
+    wallParticles[i].display();
+    if (wallParticles[i].isDead()) {
+      wallParticles.splice(i, 1);
+    }
+  }
+
+  // 💥 흔들림 효과
+  if (shakeTimer > 0) {
+    shakeOffsetX = random(-5, 5);
+    shakeOffsetY = random(-5, 5);
+    shakeTimer--;
+  } else {
+    shakeOffsetX = 0;
+    shakeOffsetY = 0;
+  }
+
+  push();
+  translate(shakeOffsetX, shakeOffsetY);
+
+  // 💥 폭발 버블
   for (let i = burstBubbles.length - 1; i >= 0; i--) {
     burstBubbles[i].update();
     burstBubbles[i].display();
@@ -140,6 +228,7 @@ function draw() {
     }
   }
 
+  // 🎉 로고 스타일 0 - 폭발 애니메이션
   if (currentStyleIndex === 0) {
     if (!exploded) {
       logoScale += 0.005;
@@ -155,25 +244,22 @@ function draw() {
     } else {
       popAlpha -= 10;
       if (popAlpha < 0) popAlpha = 0;
-
-      if (frameCount - explosionFrame > 60) {
-        resetExplosion();
-      }
+      if (frameCount - explosionFrame > 60) resetExplosion();
     }
   } else {
     logoScale = 1.0;
     exploded = false;
   }
 
+  // 🔤 로고 흔들림 (Style 0)
   if (currentStyleIndex === 0) {
     for (let i = 0; i < 5; i++) {
       const elapsed = frameCount - letterStartFrames[i];
       if (elapsed < 90) {
         letterStates[i] = "shake";
         letterScales[i] = 1 + 0.05 * sin(radians(frameCount * 10 + i * 30));
-        const direction = i % 2 === 0 ? -1 : 1;
-        letterOffsetsY[i] =
-          direction * 3 * sin(radians(frameCount * 15 + i * 40));
+        const dir = i % 2 === 0 ? -1 : 1;
+        letterOffsetsY[i] = dir * 3 * sin(radians(frameCount * 15 + i * 40));
       } else if (elapsed < 120) {
         letterStates[i] = "settle";
         const t = map(elapsed, 90, 120, 0, 1);
@@ -193,20 +279,81 @@ function draw() {
     letterOffsetsX.fill(0);
   }
 
-  const groupY = height * 0.4;
+// 🧃 병 이미지 (showBottle)
+if (showBottle) {
+  imageMode(CENTER);
+  const maxHeightRatio = 0.4;
+  const maxBottleHeight = height * maxHeightRatio;
+  const scale = maxBottleHeight / bottleImage.height;
+  const scaledWidth = bottleImage.width * scale * 2;  // 병 크기 2배로 키움
+  const scaledHeight = bottleImage.height * scale * 2; // 병 크기 2배로 키움
+  const centerY = height * 0.55;
 
-  // ✅ 중심 정렬 및 스케일 적용
+  // **제목을 병 이미지 위로 표시**
+  textFont(customFont); // 커스텀 폰트 적용
+  fill(0);
+  textSize(150);
+  textAlign(CENTER, CENTER);
+  text(bottleLabel, width / 2, centerY - scaledHeight / 2 - 30); // 병 이미지 위에 텍스트
+
+  // 병 이미지 그리기
+  image(bottleImage, width / 2, centerY, scaledWidth, scaledHeight);
+
+  // 메시지 텍스트
+  textSize(18);
+  setEnglishFont(message);
+  text(message, width / 2, centerY + scaledHeight / 2 + 60);
+
+  // 리셋 버튼 크기 두 배로 키우기
+  resetBtn.style("padding", "16px 32px");  // 버튼 크기 2배로 키우기
+  resetBtn.style("font-size", "32px");  // 글자 크기도 키우기
+  resetBtn.style("font-family", "customFont");  // 커스텀 폰트 적용
+
+  // 리셋 버튼 마진-탑 20픽셀 추가
+  resetBtn.style("margin-top", "20px");
+}
+
+  // 🎉 Style 2: 스티커 효과
+  if (currentStyleIndex === 2) {
+    createStickers();
+    for (let i = stickers.length - 1; i >= 0; i--) {
+      stickers[i].update();
+      stickers[i].display();
+      if (stickers[i].isDead()) stickers.splice(i, 1);
+    }
+  }
+
+  // 🟢 Style 3: 로고 주변 입자
+  if (currentStyleIndex === 3) {
+    if (particles.length === 0) createParticles();
+    drawParticles();
+  }
+
+  // ⬛ Style 4: 테트리스
+  if (currentStyleIndex === 4 && tetrisFrame === 0) initTetris();
+  if (currentStyleIndex === 4) {
+    updateTetris();
+    drawTetris();
+  }
+
+  if (currentStyleIndex === 5) {
+    if (particles.length === 0) createParticles();
+
+    drawParticles();
+  }
+
+  // 🔠 로고 텍스트 + 스타일
+  const groupY = height * 0.4;
   push();
   translate(width / 2, groupY);
   const baseScale = min(width, height) / 1000;
   scale(baseScale * (currentStyleIndex === 0 ? 1.2 * logoScale : 1.2));
-
   const logoWidth = 349;
   translate(-logoWidth / 2, -100);
   drawLogo(groupY);
   pop();
 
-  // ✅ 픽셀 입자는 여기서만 렌더링!
+  // ✨ Style 1: 픽셀 효과
   if (currentStyleIndex === 1) {
     if (!hasGeneratedPixels) {
       generatePixelParticlesFromVector();
@@ -220,68 +367,31 @@ function draw() {
     }
     pop();
 
-    // 주기적으로 입자 폭발
-    if (frameCount - pixelCycleTimer > pixelCycleInterval) {
+    if (frameCount - pixelCycleTimer > 120) {
       for (let p of pixelParticles) {
         if (p.state === "waiting") {
-          p.vx = random(-4, 4); // ✅ 좌우로 더 넓게 퍼짐
-          p.vy = random(-6, -2); // 그대로 유지
+          p.vx = random(-4, 4);
+          p.vy = random(-6, -2);
           p.state = "exploding";
         }
       }
       pixelCycleTimer = frameCount;
     }
-
   }
 
+  // 🔤 입력창 위치
   inputContainer.position((width - 1160) / 2, height * 0.7);
 
-  if (showBottle) {
-    imageMode(CENTER);
-    const maxHeightRatio = 0.5;
-    const maxBottleHeight = height * maxHeightRatio;
-    const scale = maxBottleHeight / bottleImage.height;
-    const scaledWidth = bottleImage.width * scale;
-    const scaledHeight = bottleImage.height * scale;
-    image(bottleImage, width / 2, height * 0.65, scaledWidth, scaledHeight);
-
-    fill(0);
-    textSize(20);
-    setEnglishFont(bottleLabel);
-    text(bottleLabel, width / 2, height * 0.87);
-
-    textSize(16);
-    setEnglishFont(message);
-    text(message, width / 2, height * 0.91);
-
-    resetBtn.position(width / 2 - 60, height * 0.95);
-  }
-  // ❗ 여기부터는 버블 로직은 항상 실행됨 ✅
-  if (frameCount % 4 === 0 && mouseInsideCanvas && !mouseIsPressed) {
-    bubbles.push(new Bubble(mouseX, mouseY));
-  }
-
-  for (let i = bubbles.length - 1; i >= 0; i--) {
-    bubbles[i].update();
-    bubbles[i].display();
-    if (bubbles[i].isDead()) {
-      bubbles.splice(i, 1);
-    }
-  }
-
-  if (frameCount % 6 === 0) {
-    const randX = random(width);
-    const randY = random(height);
-    bubbles.push(new Bubble(randX, randY, true));
-  }
+  pop(); // 흔들림 끝
 }
 
 function drawLogo(groupY) {
   // 로고가 폭발했으면 기본 스타일은 그리지 않음
   if (currentStyleIndex === 0 && exploded) return;
 
-  // 외곽선 있는 경우만 stroke 설정
-  if (logoStyles[currentStyleIndex].stroke) {
+  // 외곽선 있는 경우만 stroke 설정 (2번 인덱스 제외)
+  if (logoStyles[currentStyleIndex].stroke && currentStyleIndex !== 2) {
+    // 2번 인덱스에서는 로고의 스트로크를 유지하고, 스티커에만 영향을 주도록
     stroke(logoStyles[currentStyleIndex].stroke);
     strokeWeight(4);
   } else {
@@ -308,14 +418,13 @@ function drawLogo(groupY) {
   vertex(14.92, 142.6);
   endShape(CLOSE);
 
-  // ▶️ 1번 스타일은 픽셀 입자 효과!
+  // 1번 스타일은 픽셀 입자 효과!
   if (currentStyleIndex === 1) {
     // 입자 미리 생성 안 됐으면 생성
     if (!hasGeneratedPixels) {
       generatePixelParticlesFromVector();
       hasGeneratedPixels = true;
     }
-
     return;
   }
 
@@ -332,6 +441,71 @@ function drawLogo(groupY) {
   drawA2();
   pop();
   pop();
+}
+
+function createStickers() {
+  if (stickers.length >= totalStickers) {
+    allStickersCreated = true; // 모든 스티커가 생성되면 true
+    return; // 스티커가 다 생성되었으면 더 이상 생성하지 않음
+  }
+
+  if (frameCount >= nextStickerTime) {
+    // 스티커를 생성할 시간에 도달했으면
+    stickers.push(new Sticker()); // 새로운 스티커 생성 (지연 없음, 바로 생성)
+    nextStickerTime = frameCount + stickerInterval; // 다음 스티커 생성 시간 갱신
+  }
+}
+class Sticker {
+  constructor() {
+    this.x = random(width); // 화면 내 랜덤 x 위치
+    this.y = random(height * 0.4); // 화면 안쪽에 위치 (위쪽에 위치)
+    this.angle = random(TWO_PI); // 랜덤한 각도
+    this.scale = random(0.2, 0.5); // 크기 더 작게 설정
+    this.speed = random(2, 5); // 떨어지는 속도
+    this.alpha = 255; // 투명도
+    this.dropped = false; // 초기에는 떨어지지 않음
+  }
+
+  update() {
+    if (!this.dropped) {
+      if (frameCount >= stickerStartTime) {
+        this.dropped = true;
+      }
+    }
+
+    if (this.dropped) {
+      this.y += this.speed;
+
+      // ✨ 2번 인덱스일 경우 천천히 투명도 줄이기
+      if (currentStyleIndex === 2) {
+        this.alpha -= 0.8; // 💡 0.8 정도로 천천히 감소
+        if (this.alpha < 0) this.alpha = 0; // 음수 방지
+      }
+    }
+  }
+
+  display() {
+    if (currentStyleIndex === 2) {
+      noStroke();
+    } else {
+      stroke(logoStyles[currentStyleIndex].stroke || 0);
+      strokeWeight(4);
+    }
+
+    // ✨ 투명도 적용
+    fill(255, this.alpha);
+
+    push();
+    translate(this.x, this.y);
+    rotate(this.angle);
+    scale(this.scale);
+    drawLogo(); // 로고 그리기
+    pop();
+  }
+
+  isDead() {
+    return this.alpha <= 0; // 투명해진 후 삭제
+  }
 }
 
 function createBurstBubbles() {
@@ -364,7 +538,6 @@ function createBurstBubbles() {
     burstBubbles.push(bubble);
   }
 }
-
 function generatePixelParticlesFromVector() {
   pixelParticles = [];
 
@@ -397,6 +570,297 @@ function generatePixelParticlesFromVector() {
         pixelParticles.push(new PixelParticle(x, y));
       }
     }
+  }
+}
+
+function initTetris() {
+  // 화면 전체 높이에 맞춰 블록 크기 설정 (전체를 다 쓰기 위함)
+  tetrisCellSize = height / tetrisRows;
+
+  // X 위치는 가운데 정렬
+  tetrisX = (width - tetrisCols * tetrisCellSize) / 2;
+
+  // Y 위치는 꼭대기부터 시작
+  tetrisY = 0;
+
+  // 보드 초기화
+  tetrisBoard = Array.from({ length: tetrisRows }, () =>
+    Array(tetrisCols).fill(null)
+  );
+  tetrisColors = logoStyles[4].textColors.map((c) => color(c));
+  spawnPiece();
+
+  tetrisFrame = 0; // 초기화 시 프레임 리셋도 잊지 말기
+}
+class StarParticle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = random(-1, 1);
+    this.vy = random(-3, -1);
+    this.alpha = 255;
+    this.size = random(4, 7);
+    this.color = color(255, 255, 0, this.alpha); // 노란 별
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.alpha -= 5;
+    this.color.setAlpha(this.alpha);
+  }
+
+  display() {
+    noStroke();
+    fill(this.color);
+    ellipse(this.x, this.y, this.size);
+  }
+
+  isDead() {
+    return this.alpha <= 0;
+  }
+}
+
+function drawTetris() {
+  for (let r = 0; r < tetrisRows; r++) {
+    for (let c = 0; c < tetrisCols; c++) {
+      const val = tetrisBoard[r][c];
+      if (val !== null) {
+        fill(val);
+        stroke(255);
+        rect(
+          tetrisX + c * tetrisCellSize,
+          tetrisY + r * tetrisCellSize,
+          tetrisCellSize,
+          tetrisCellSize
+        );
+      }
+    }
+  }
+
+  // 현재 조각 그리기
+  if (currentPiece) {
+    fill(currentPiece.color);
+    for (let b of currentPiece.blocks) {
+      const px = currentPiece.x + b[0];
+      const py = currentPiece.y + b[1];
+      rect(
+        tetrisX + px * tetrisCellSize,
+        tetrisY + py * tetrisCellSize,
+        tetrisCellSize,
+        tetrisCellSize
+      );
+    }
+  }
+}
+
+function spawnPiece() {
+  const shapes = [
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ], // O
+    [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [2, 0],
+    ], // I
+    [
+      [0, 0],
+      [-1, 0],
+      [0, 1],
+      [1, 1],
+    ], // S
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [-1, 1],
+    ], // Z
+    [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [1, 1],
+    ], // L
+    [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [-1, 1],
+    ], // J
+    [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [0, 1],
+    ], // T
+  ];
+  const idx = floor(random(shapes.length));
+  const newPiece = new TetrisPiece(
+    shapes[idx],
+    floor(tetrisCols / 2),
+    0,
+    random(tetrisColors)
+  );
+
+  // 💥 여기가 핵심! 새 조각이 유효하지 않으면 게임 종료
+  if (!newPiece.valid(newPiece.x, newPiece.y, newPiece.blocks)) {
+    triggerTetrisExplosion();
+    currentPiece = null;
+    resetTetrisGame(); // 재시작 대기
+    return;
+  }
+
+  currentPiece = newPiece;
+}
+
+function resetTetrisGame() {
+  setTimeout(() => {
+    initTetris();
+  }, 1000); // 1초 뒤 재시작
+}
+
+class TetrisPiece {
+  constructor(blocks, x, y, color) {
+    this.blocks = blocks;
+    this.x = x;
+    this.y = y;
+    this.color = color;
+  }
+
+  move(dx, dy) {
+    if (this.valid(this.x + dx, this.y + dy, this.blocks)) {
+      this.x += dx;
+      this.y += dy;
+      return true;
+    }
+    return false;
+  }
+
+  drop() {
+    if (!this.move(0, 1)) {
+      this.lock();
+    }
+  }
+
+  rotate() {
+    const rotated = this.blocks.map(([x, y]) => [-y, x]);
+    if (this.valid(this.x, this.y, rotated)) {
+      this.blocks = rotated;
+    }
+  }
+
+  valid(x, y, blocks) {
+    return blocks.every(([bx, by]) => {
+      const nx = x + bx;
+      const ny = y + by;
+      return (
+        nx >= 0 &&
+        nx < tetrisCols &&
+        ny >= 0 &&
+        ny < tetrisRows &&
+        !tetrisBoard[ny][nx]
+      );
+    });
+  }
+
+  lock() {
+    let gameOver = false;
+
+    for (let [bx, by] of this.blocks) {
+      const nx = this.x + bx;
+      const ny = this.y + by;
+      if (ny < 0) {
+        gameOver = true;
+        continue;
+      }
+      tetrisBoard[ny][nx] = this.color;
+    }
+
+    clearLines();
+
+    if (gameOver) {
+      triggerTetrisExplosion();
+      currentPiece = null; // 💀 없애기
+      resetTetrisGame(); // ⏱ 1초 후 재시작
+    } else {
+      spawnPiece();
+    }
+  }
+}
+
+function triggerTetrisExplosion() {
+  const total = 100;
+  if (popSound && popSound.isLoaded()) popSound.play(); // 💥 재생
+  const colors = logoStyles[4].bubbles.map((c) => color(c));
+  for (let i = 0; i < total; i++) {
+    const x = random(tetrisX, tetrisX + tetrisCols * tetrisCellSize);
+    const y = random(tetrisY, tetrisY + tetrisRows * tetrisCellSize);
+    const angle = random(TWO_PI);
+    const speed = random(3, 7);
+    const vx = cos(angle) * speed;
+    const vy = sin(angle) * speed;
+    const bubble = new BurstBubble(x, y, vx, vy, random(colors));
+    burstBubbles.push(bubble);
+  }
+}
+function triggerLineClearExplosion(rowIndex) {
+  if (popSound && popSound.isLoaded()) popSound.play(); // 💥 재생
+
+  shakeTimer = 10; // 💥 10프레임 흔들림
+  const colors = logoStyles[4].bubbles.map((c) => color(c));
+  for (let i = 0; i < 40; i++) {
+    const x = random(tetrisX, tetrisX + tetrisCols * tetrisCellSize);
+    const y = tetrisY + rowIndex * tetrisCellSize + tetrisCellSize / 2;
+    const angle = random(TWO_PI);
+    const speed = random(2, 6);
+    const vx = cos(angle) * speed;
+    const vy = sin(angle) * speed;
+    burstBubbles.push(new BurstBubble(x, y, vx, vy, random(colors)));
+  }
+}
+
+function updateTetris() {
+  if (currentPiece && tetrisFrame % tetrisDropSpeed === 0) {
+    currentPiece.drop();
+  }
+  tetrisFrame++;
+}
+
+function clearLines() {
+  for (let r = tetrisRows - 1; r >= 0; r--) {
+    if (tetrisBoard[r].every((cell) => cell !== null)) {
+      triggerLineClearExplosion(r); // 💥 연출 추가
+      tetrisBoard.splice(r, 1);
+      tetrisBoard.unshift(Array(tetrisCols).fill(null));
+      r++; // 다시 검사
+    }
+  }
+}
+function keyPressed() {
+  if (currentStyleIndex === 4 && currentPiece) {
+    if (keyCode === LEFT_ARROW) {
+      const moved = currentPiece.move(-1, 0);
+      if (!moved) spawnWallParticles(tetrisX); // 왼쪽 끝
+    } else if (keyCode === RIGHT_ARROW) {
+      const moved = currentPiece.move(1, 0);
+      if (!moved) spawnWallParticles(tetrisX + tetrisCols * tetrisCellSize); // 오른쪽 끝
+    } else if (keyCode === DOWN_ARROW) {
+      currentPiece.drop();
+    } else if (keyCode === UP_ARROW) {
+      currentPiece.rotate();
+    }
+  }
+}
+
+function spawnWallParticles(xPos) {
+  const yPos = tetrisY + currentPiece.y * tetrisCellSize + tetrisCellSize / 2;
+  for (let i = 0; i < 10; i++) {
+    wallParticles.push(new StarParticle(xPos, yPos));
   }
 }
 
@@ -478,6 +942,74 @@ class PixelParticle {
   }
 }
 
+class Particle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.originX = x;
+    this.originY = y;
+    this.size = random(10, 20);
+
+    // 기본 색상은 3번 스타일 색상
+    this.color = color(random(logoStyles[3].bubbles));
+
+    this.vx = 0;
+    this.vy = 0;
+  }
+
+  update() {
+    const dx = mouseX - this.x;
+    const dy = mouseY - this.y;
+    const distSq = dx * dx + dy * dy; // 마우스와의 거리 계산
+    const maxDist = 100; // 영향 반경
+
+    // 마우스와 가까운 파티클만 노란색으로 변하도록
+    if (distSq < maxDist * maxDist && currentStyleIndex === 5) {
+      this.color = color(255, 193, 7); // 노란색으로 변경
+    }
+
+    if (distSq < maxDist * maxDist) {
+      const force = (1 - distSq / (maxDist * maxDist)) * 10; // 강한 밀어냄
+      const angle = atan2(dy, dx);
+      this.vx -= cos(angle) * force;
+      this.vy -= sin(angle) * force;
+    }
+
+    // 이동 & 되돌아오게 하기
+    this.vx *= 0.9;
+    this.vy *= 0.9;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // 원래 자리로 살살 복원
+    this.x += (this.originX - this.x) * 0.02;
+    this.y += (this.originY - this.y) * 0.02;
+  }
+
+  display() {
+    noStroke();
+    fill(this.color); // 색상 적용
+    ellipse(this.x, this.y, this.size);
+  }
+}
+
+function drawParticles() {
+  for (let p of particles) {
+    p.update();
+    p.display();
+  }
+}
+
+function createParticles() {
+  particles = []; // 꼭 비워줘야 중복 생성을 막아
+  for (let x = 0; x < width; x += 40) {
+    for (let y = 0; y < height; y += 40) {
+      particles.push(new Particle(x, y));
+    }
+  }
+}
+
 function drawLogoVector(pg) {
   pg.noStroke();
 
@@ -527,8 +1059,9 @@ function drawLogoVector(pg) {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  particles = []; // 화면 크기 변경 시 버블 리셋
+  createParticles(); // 새로운 버블 생성
 }
-
 //drawF, drawA1, drawN 등dpj drawF(pg), drawA1(pg)처럼 변경 필요 (pg.beginShape 등 사용)
 function drawF() {
   fill(logoStyles[currentStyleIndex].textColors[0]);
@@ -646,36 +1179,56 @@ function drawA2() {
 }
 
 function mousePressed() {
+  const withinInput =
+    mouseX >= inputContainer.position().x &&
+    mouseX <= inputContainer.position().x + inputContainer.size().width &&
+    mouseY >= inputContainer.position().y &&
+    mouseY <= inputContainer.position().y + inputContainer.size().height;
+
+  if (withinInput) return; // 검색창 클릭 무시
+
+  // 배경 누르면 스타일 전환
   currentStyleIndex = (currentStyleIndex + 1) % logoStyles.length;
   flavorColors = logoStyles[currentStyleIndex].bubbles.map((c) => color(c));
   hasGeneratedPixels = false;
-}
 
-function dispense() {
-  const val = input.value().toLowerCase();
-  showBottle = true;
-  inputContainer.hide();
-  resetBtn.show();
-
-  if (val.includes("고양이") || val.includes("cat")) {
-    bottleLabel = "😺 CAT FANTA";
-    message = "고양이 밈이 들어간 딸기환타 등장!";
-  } else if (val.includes("우울") || val.includes("sad")) {
-    bottleLabel = "🍓 CHEER UP!";
-    message = "기분전환 딸기향 응원 메시지!";
-  } else {
-    bottleLabel = "✨ RANDOM FANTA";
-    message = "랜덤 환타가 팡!";
+  if (currentStyleIndex !== 1) {
+    pixelCycleTimer = 0;
   }
 }
 
-function reset() {
-  showBottle = false;
-  inputContainer.show();
-  resetBtn.hide();
-  input.value("");
+function dispense() {
+  // 랜덤 음료 및 행운의 응원 설정 (이모티콘 제외, 느낌표 추가)
+  const drinks = [
+    { label: "WEALTHY FANTA!", message: "Wealthy Taste!" }, // 돈 많아지는 맛
+    { label: "LUCKY FANTA!", message: "Lucky Taste!" }, // 행운 가득한 맛
+    { label: "HEALTHY FANTA!", message: "Healthy Taste!" }, // 건강해지는 맛
+    { label: "SLIMMING FANTA!", message: "Slimming Taste!" }, // 살 빠지는 맛
+    { label: "SUCCESS FANTA!", message: "Success Taste!" }, // 성공의 맛
+    { label: "FORTUNE FANTA!", message: "Fortune Taste!" }, // 행운의 맛
+  ];
+
+  // 랜덤 음료 선택
+  const randomDrink = random(drinks);
+  bottleLabel = randomDrink.label;
+  message = randomDrink.message;
+
+  showBottle = true;
+  inputContainer.hide();
+
+  // ✅ 버튼 보이게 활성화
+  resetBtn.show();
+  resetBtn.style("opacity", "1");
+  resetBtn.style("pointer-events", "auto");
+
+  // 🔁 리셋 버튼 위치 (하단 중앙 고정)
+  resetBtn.position(windowWidth / 2 - resetBtn.width / 2 - 20, windowHeight - 100); // 화면 하단 중앙 고정
 }
 
+
+function reset() {
+  location.reload();
+}
 class Bubble {
   constructor(x, y, isBackground = false) {
     this.x = x;
