@@ -133,16 +133,23 @@ function draw() {
       shipTrail.push({ x: shipPos.x, y: shipPos.y, life: 0 });
       shipPos.add(shipDirection);
     }
-
+  
     // 수평선 위쪽에 도달하면 수동 전환
     if (shipPos.y <= horizonY - 100) {
       isAutoShip = false;
     }
   } else {
-    if (mouseY > horizonY) {
+    // 마우스가 화면 안에 있고, 수평선 아래에 있을 때만 흔적 추가
+    if (
+      mouseX >= 0 &&
+      mouseX <= width &&
+      mouseY >= horizonY &&
+      mouseY <= height
+    ) {
       shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
     }
   }
+  
 
   drawShipTrail();
   drawBubbles();
@@ -386,14 +393,19 @@ function drawStars() {
   }
 }
 
-
 function createClouds() {
   clouds = [];
   let cloudCount = random(15, 25);
   let tries = 0;
+
   let horizonY = height * horizonRatio;
-  let maxCloudY = horizonY * 0.75;
+
+  // ✅ 수평선보다 더 위쪽으로 생성되도록 조정
   let minCloudY = height * 0.05;
+  let maxCloudY = horizonY * 0.55; // 기존 0.75 → 0.55 로 상향 조정
+
+  // ✅ 구름 크기 반응형 & 절반 축소
+  let baseScale = map(width, 500, 1500, 0.3, 0.65); // 기존보다 50% 작게
 
   while (clouds.length < cloudCount && tries < 200) {
     let x = random(width * 0.1, width * 0.9);
@@ -404,11 +416,10 @@ function createClouds() {
       continue;
     }
 
-    let s = random(1.5, 2.5); // 구름 크기
+    let s = random(1.0, 1.4) * baseScale;
     let alpha = ["twilight", "night", "stormy"].includes(timeOfDay) ? 30 : 60;
     let style = floor(random(3));
-
-    let vx = random(0.3, 0.6) * (random() < 0.5 ? 1 : -1); // 속도 2~3배로 조정
+    let vx = random(0.3, 0.6) * (random() < 0.5 ? 1 : -1);
 
     clouds.push({ x, y, s, alpha, style, vx });
     tries++;
@@ -420,48 +431,34 @@ function updateClouds() {
     let c = clouds[i];
     c.x += c.vx;
 
-    // 화면을 벗어나면 반대쪽에서 재등장
-    if (c.x < -400) {
-      c.x = width + 400;
-    } else if (c.x > width + 400) {
-      c.x = -400;
+    let buffer = 400 * c.s;
+
+    // 오른쪽으로 나가면 왼쪽으로 순환
+    if (c.vx > 0 && c.x - buffer > width) {
+      c.x = -buffer;
+    }
+
+    // 왼쪽으로 나가면 오른쪽으로 순환
+    if (c.vx < 0 && c.x + buffer < 0) {
+      c.x = width + buffer;
     }
   }
 }
 
-function updateClouds() {
-  for (let i = 0; i < clouds.length; i++) {
-    let c = clouds[i];
-    c.x += c.vx;
-
-    // 화면을 벗어나면 반대쪽에서 재등장
-    if (c.x < -300) {
-      c.x = width + 300;
-    } else if (c.x > width + 300) {
-      c.x = -300;
-    }
-  }
-}
 
 function addCloud(xPos) {
   let horizonY = height * horizonRatio;
-  let y = random(height * 0.05, horizonY * 0.75);
-  let s = random(1.0, 2.5);
+  let minY = height * 0.05;
+  let maxY = horizonY * 0.9;
+
+  let baseScale = map(width, 500, 1500, 0.6, 1.3);
+  let y = random(minY, maxY);
+  let s = random(1.0, 1.4) * baseScale;
+
   let alpha = ["twilight", "night", "stormy"].includes(timeOfDay) ? 30 : 60;
   let style = floor(random(3));
 
-  let baseSpeed = 0.25;
-  let speedMultiplier = random(1.0, 1.8); // ← 약간 더 빠르게
-  let vx;
-  if (shipDirection) {
-    // 방향에 너무 휘둘리지 않도록 중간치와 랜덤 혼합
-    let baseDir = shipDirection.x * baseSpeed * speedMultiplier;
-    vx = baseDir + random(-0.2, 0.2); // 약간의 랜덤 편차 추가
-  } else {
-    vx = random(0, 1); // 랜덤 속도
-  }
-  
-  let maxLife = random(2500, 5000); // 생명도 살짝 늘려줌
+  let vx = random(0.3, 0.6) * (random() < 0.5 ? 1 : -1);
 
   clouds.push({
     x: xPos,
@@ -471,26 +468,36 @@ function addCloud(xPos) {
     style,
     vx,
     life: 0,
-    maxLife,
+    maxLife: random(2500, 5000),
   });
 }
-
-
 function drawClouds() {
   for (let c of clouds) {
-    switch (c.style) {
-      case 0:
-        drawCloudStyle1(c.x, c.y, c.s, c.alpha);
-        break;
-      case 1:
-        drawCloudStyle2(c.x, c.y, c.s, c.alpha);
-        break;
-      case 2:
-        drawCloudStyle3(c.x, c.y, c.s, c.alpha);
-        break;
-    }
+    // 기본 구름
+    drawSingleCloud(c);
+
+    // 왼쪽에 복제 (화면 이어짐 보정)
+    drawSingleCloud({ ...c, x: c.x - width });
+
+    // 오른쪽에 복제 (반대 방향용)
+    drawSingleCloud({ ...c, x: c.x + width });
   }
 }
+
+function drawSingleCloud(c) {
+  switch (c.style) {
+    case 0:
+      drawCloudStyle1(c.x, c.y, c.s, c.alpha);
+      break;
+    case 1:
+      drawCloudStyle2(c.x, c.y, c.s, c.alpha);
+      break;
+    case 2:
+      drawCloudStyle3(c.x, c.y, c.s, c.alpha);
+      break;
+  }
+}
+
 
 function drawSunOrMoon() {
   let isNightTime = ["night", "twilight", "stormy", "blush"].includes(
@@ -506,91 +513,80 @@ function drawSunOrMoon() {
 function drawSun() {
   push();
   translate(sunPos.x, sunPos.y);
-  scale(2); //전체 크기 2배로 확대
+
+  let scaleFactor = map(width, 500, 1500, 0.4, 0.9) * 1.3;
+  scale(scaleFactor);
 
   noStroke();
 
-  // 광륜 효과
+  // 🔆 태양 오라
   for (let i = 10; i >= 1; i--) {
     let alpha = map(i, 10, 1, 10, 100);
     let radius = 80 + i * 15;
     fill(255, 255, 200, alpha);
-    ellipse(0, 0, radius); // 중심에서 그리도록 수정
+    ellipse(0, 0, radius);
   }
 
-  // 중심 태양
+  // ☀️ 태양 본체
   fill(255, 240, 150, 255);
   ellipse(0, 0, 100);
 
-  pop(); // 🎯 스케일링 끝
+  // 🔥 표면 노이즈
+  let detail = 3;
+  for (let x = -50; x < 50; x += detail) {
+    for (let y = -50; y < 50; y += detail) {
+      let d = dist(0, 0, x, y);
+      if (d < 50) {
+        let n = noise((x + frameCount * 0.8) * 0.05, (y + frameCount * 0.8) * 0.05);
+        let r = map(n, 0, 1, 220, 255);
+        let g = map(n, 0, 1, 150, 200);
+        let b = map(n, 0, 1, 80, 120);
+        fill(r, g, b, 12);
+        ellipse(x, y, detail * 1.5);
+      }
+    }
+  }
+
+  pop();
 }
 
 function drawMoon() {
   push();
   translate(moonPos.x, moonPos.y);
-  scale(0.28); // 달 크기
-  scale(2.5); 
+
+  let scaleFactor = map(width, 500, 1500, 0.4, 0.9);
+  scale(0.28 * scaleFactor);
+
   noStroke();
 
-  // 강한 블러의 월광 효과
+  // ✨ 블러 달빛 효과
   drawingContext.save();
-  drawingContext.filter = "blur(60px)"; // 블러를 훨씬 더 강하게
-  fill(200, 220, 255, 160); // 몽환적인 달빛 컬러
-
-  beginShape();
-  if (moonShapeIndex === 0) {
-    vertex(198, 0);
-    vertex(198, 395);
-    bezierVertex(198, 395, 197.667, 395, 197.5, 395);
-    bezierVertex(88.4238, 395, 0, 306.576, 0, 197.5);
-    bezierVertex(0, 88.4238, 88.4238, 0, 197.5, 0);
-    bezierVertex(197.667, 0, 198, 0, 198, 0);
-  } else if (moonShapeIndex === 1) {
-    vertex(221, 0);
-    bezierVertex(258.685, 0, 294.167, 9.4327, 325.214, 26.0654);
-    bezierVertex(312.226, 23.4, 298.776, 22, 285, 22);
-    bezierVertex(175.095, 22, 86, 111.095, 86, 221);
-    bezierVertex(86, 330.905, 175.095, 420, 285, 420);
-    bezierVertex(298.777, 420, 312.226, 418.599, 325.214, 415.934);
-    bezierVertex(294.167, 432.566, 258.685, 442, 221, 442);
-    bezierVertex(98.9451, 442, 0, 343.055, 0, 221);
-    bezierVertex(0, 98.9451, 98.9451, 0, 221, 0);
-  } else {
-    ellipse(0, 0, 500, 500);
-    endShape();
-    drawingContext.restore();
-    fill(245, 245, 255, 240);
-    ellipse(0, 0, 500, 500);
-    pop();
-    return;
-  }
-  endShape(CLOSE);
+  drawingContext.filter = "blur(80px)";
+  fill(200, 220, 255, 160);
+  ellipse(0, 0, 500, 500);
   drawingContext.restore();
 
-  // 달 본체
+  // 🌕 달 본체
   fill(245, 245, 255, 240);
-  beginShape();
-  if (moonShapeIndex === 0) {
-    vertex(198, 0);
-    vertex(198, 395);
-    bezierVertex(198, 395, 197.667, 395, 197.5, 395);
-    bezierVertex(88.4238, 395, 0, 306.576, 0, 197.5);
-    bezierVertex(0, 88.4238, 88.4238, 0, 197.5, 0);
-    bezierVertex(197.667, 0, 198, 0, 198, 0);
-  } else if (moonShapeIndex === 1) {
-    vertex(221, 0);
-    bezierVertex(258.685, 0, 294.167, 9.4327, 325.214, 26.0654);
-    bezierVertex(312.226, 23.4, 298.776, 22, 285, 22);
-    bezierVertex(175.095, 22, 86, 111.095, 86, 221);
-    bezierVertex(86, 330.905, 175.095, 420, 285, 420);
-    bezierVertex(298.777, 420, 312.226, 418.599, 325.214, 415.934);
-    bezierVertex(294.167, 432.566, 258.685, 442, 221, 442);
-    bezierVertex(98.9451, 442, 0, 343.055, 0, 221);
-    bezierVertex(0, 98.9451, 98.9451, 0, 221, 0);
+  ellipse(0, 0, 500, 500);
+
+  // 🌌 노이즈 텍스처
+  let detail = 4; // 픽셀 간격 (낮을수록 디테일 ↑)
+  for (let x = -250; x < 250; x += detail) {
+    for (let y = -250; y < 250; y += detail) {
+      let d = dist(0, 0, x, y);
+      if (d < 250) {
+        let n = noise((x + frameCount * 0.1) * 0.01, (y + frameCount * 0.1) * 0.01);
+        let bright = map(n, 0, 1, 220, 255);
+        fill(bright, bright, 255, 8); // 옅은 점으로 텍스처 느낌
+        ellipse(x, y, detail * 1.2);
+      }
+    }
   }
-  endShape(CLOSE);
+
   pop();
 }
+
 
 function drawOcean() {
   drawWaveParticles();
@@ -682,11 +678,18 @@ function drawShipTrail() {
     }
   }
 
+  // ✅ 흔적 제거 조건 추가
   for (let i = shipTrail.length - 1; i >= 0; i--) {
-    shipTrail[i].life++;
+    let p = shipTrail[i];
+    p.life++;
+
+    let outOfScreen =
+      p.x < -100 || p.x > width + 100 || p.y < -100 || p.y > height + 100;
+
     if (
-      shipTrail[i].life > 300 ||
-      shipTrail[i].y <= height * horizonRatio - 20
+      p.life > 300 ||
+      p.y <= height * horizonRatio - 20 ||
+      outOfScreen
     ) {
       shipTrail.splice(i, 1);
     }
@@ -770,12 +773,6 @@ function drawBubbles() {
   }
 }
 
-function mouseMoved() {
-  let horizonY = height * horizonRatio;
-  if (mouseY > horizonY) {
-    shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
-  }
-}
 
 function createShipTrail() {
   shipPos = createVector(random(width * 0.3, width * 0.7), height + 50);
@@ -852,21 +849,6 @@ function drawCloudStyle3(x, y, scaleVal = 1, alpha = 255) {
   endShape(CLOSE);
   pop();
 }
-
-function keyPressed() {
-  if (keyCode === LEFT_ARROW) {
-    turnAngle = -0.05; // 왼쪽으로 회전
-  } else if (keyCode === RIGHT_ARROW) {
-    turnAngle = 0.05; // 오른쪽으로 회전
-  }
-}
-
-function keyReleased() {
-  if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
-    turnAngle = 0;
-  }
-}
-
 let rainbowBuffer = null;
 
 function drawRainbow() {
@@ -918,3 +900,31 @@ function drawRainbow() {
   noTint();
   pop();
 }
+function keyPressed() {
+  if (keyCode === LEFT_ARROW) {
+    turnAngle = -0.05; // 왼쪽으로 회전
+  } else if (keyCode === RIGHT_ARROW) {
+    turnAngle = 0.05; // 오른쪽으로 회전
+  }
+}
+
+function keyReleased() {
+  if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
+    turnAngle = 0;
+  }
+}
+
+
+function mouseMoved() {
+  let horizonY = height * horizonRatio;
+
+  if (
+    mouseX >= 0 &&
+    mouseX <= width &&
+    mouseY >= horizonY &&
+    mouseY <= height
+  ) {
+    shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
+  }
+}
+
