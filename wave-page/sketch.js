@@ -506,7 +506,7 @@ function drawSunOrMoon() {
 function drawSun() {
   push();
   translate(sunPos.x, sunPos.y);
-  scale(2.5); //전체 크기 2배로 확대
+  scale(2); //전체 크기 2배로 확대
 
   noStroke();
 
