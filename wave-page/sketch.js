@@ -448,18 +448,6 @@ function addCloud(xPos) {
     maxLife: random(2500, 5000),
   });
 }
-function drawClouds() {
-  for (let c of clouds) {
-    // 기본 구름
-    drawSingleCloud(c);
-
-    // 왼쪽에 복제 (화면 이어짐 보정)
-    drawSingleCloud({ ...c, x: c.x - width });
-
-    // 오른쪽에 복제 (반대 방향용)
-    drawSingleCloud({ ...c, x: c.x + width });
-  }
-}
 
 function drawSingleCloud(c) {
   switch (c.style) {
@@ -538,18 +526,18 @@ function drawMoon() {
 
   noStroke();
 
-  // ✨ 블러 달빛 효과
+  // 블러 달빛 효과
   drawingContext.save();
   drawingContext.filter = "blur(80px)";
   fill(200, 220, 255, 160);
   ellipse(0, 0, 500, 500);
   drawingContext.restore();
 
-  // 🌕 달 본체
+  // 달 본체
   fill(245, 245, 255, 240);
   ellipse(0, 0, 500, 500);
 
-  // 🌌 노이즈 텍스처
+  // 노이즈 텍스처
   let detail = 4; // 픽셀 간격 (낮을수록 디테일 ↑)
   for (let x = -250; x < 250; x += detail) {
     for (let y = -250; y < 250; y += detail) {
@@ -765,12 +753,38 @@ function createShipTrail() {
   shipDirection = p5.Vector.fromAngle(angle).normalize().mult(shipSpeed);
 }
 
+function drawClouds() {
+  push();
+  drawingContext.save();
+  drawingContext.filter = "blur(23px)"; // ✅ 구름 전체에 23px 블러 적용
+  for (let c of clouds) {
+    drawSingleCloud(c);
+    drawSingleCloud({ ...c, x: c.x - width });
+    drawSingleCloud({ ...c, x: c.x + width });
+  }
+  drawingContext.restore();
+  pop();
+}
+
+function drawSingleCloud(c) {
+  switch (c.style) {
+    case 0:
+      drawCloudStyle1(c.x, c.y, c.s, c.alpha);
+      break;
+    case 1:
+      drawCloudStyle2(c.x, c.y, c.s, c.alpha);
+      break;
+    case 2:
+      drawCloudStyle3(c.x, c.y, c.s, c.alpha);
+      break;
+  }
+}
+
 function drawCloudStyle1(x, y, scaleVal = 1, alpha = 255) {
   push();
   translate(x, y);
   scale(scaleVal);
-  drawingContext.filter = "blur(12px)";
-  fill(255, 255, 255, alpha);
+  fill(255, 255, 255, alpha); // ✅ 블러는 밖에서 먹이니까 여기선 fill만
   noStroke();
   beginShape();
   vertex(287, 175);
@@ -791,9 +805,7 @@ function drawCloudStyle2(x, y, scaleVal = 1, alpha = 255) {
   push();
   translate(x, y);
   scale(scaleVal);
-  drawingContext.filter = "blur(12px)";
-  fill(255, 255, 255, alpha);
-
+  fill(255, 255, 255, alpha); // ✅
   noStroke();
   beginShape();
   vertex(214, 130);
@@ -816,8 +828,7 @@ function drawCloudStyle3(x, y, scaleVal = 1, alpha = 255) {
   push();
   translate(x, y);
   scale(scaleVal);
-  fill(255, 255, 255, alpha);
-  drawingContext.filter = "blur(12px)";
+  fill(255, 255, 255, alpha); // ✅
   noStroke();
   beginShape();
   vertex(225, 130.5);
@@ -833,14 +844,16 @@ function drawCloudStyle3(x, y, scaleVal = 1, alpha = 255) {
   endShape(CLOSE);
   pop();
 }
+
+
+
 let rainbowBuffer = null;
 
 function drawRainbow() {
   if (
     clouds.length > 0 ||
     ["night", "twilight", "stormy", "sunset"].includes(timeOfDay)
-  )
-    return;
+  ) return;
 
   let horizonY = height * horizonRatio;
 
@@ -855,18 +868,15 @@ function drawRainbow() {
       horizonY
     );
 
-    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.5)"); // 빨강
-    gradient.addColorStop(0.264423, "rgba(255, 179, 0, 0.5)"); // 주황
-    gradient.addColorStop(0.442308, "rgba(255, 247, 0, 0.5)"); // 노랑
-    gradient.addColorStop(0.586538, "rgba(0, 255, 128, 0.5)"); // 연두
-    gradient.addColorStop(0.740385, "rgba(45, 174, 255, 0.5)"); // 파랑
-    gradient.addColorStop(0.894231, "rgba(10, 0, 190, 0.5)"); // 남색
-    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.5)"); // 보라
+    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.5)");
+    gradient.addColorStop(0.25, "rgba(255, 179, 0, 0.5)");
+    gradient.addColorStop(0.4, "rgba(255, 247, 0, 0.5)");
+    gradient.addColorStop(0.55, "rgba(0, 255, 128, 0.5)");
+    gradient.addColorStop(0.7, "rgba(45, 174, 255, 0.5)");
+    gradient.addColorStop(0.85, "rgba(10, 0, 190, 0.5)");
+    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.5)");
 
     rainbowBuffer.drawingContext.fillStyle = gradient;
-
-    rainbowBuffer.drawingContext.save();
-    rainbowBuffer.drawingContext.filter = "blur(80px)";
 
     if (rainbowStyle === 1) {
       drawRainbowStyle1(rainbowBuffer, horizonY, rainbowCenterX);
@@ -875,14 +885,13 @@ function drawRainbow() {
     } else {
       drawRainbowStyle3(rainbowBuffer, horizonY, rainbowCenterX);
     }
-
-    rainbowBuffer.drawingContext.restore();
   }
 
   push();
-  tint(255, 140);
+  drawingContext.save();
+  drawingContext.filter = "blur(80px)"; // ⭐ 메인캔버스에 블러 적용
   image(rainbowBuffer, 0, 0);
-  noTint();
+  drawingContext.restore();
   pop();
 }
 
