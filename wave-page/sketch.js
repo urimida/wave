@@ -30,7 +30,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   noStroke();
 
-  cloudDirection = random() < 0.5 ? "left" : "right"; 
+  cloudDirection = random() < 0.5 ? "left" : "right";
   rainbowStyle = floor(random(1, 4));
   rainbowCenterX = random(width * 0.4, width * 0.6);
 
@@ -40,18 +40,20 @@ function setup() {
 
   const times = [
     "morning", "day", "sunset", "night", "twilight", "golden",
-    "turquoise", "mediterranean", "stormy", "blush",
+    "turquoise", "mediterranean", "stormy", "blush", "rainyNight",
   ];
-  timeOfDay = random(times); // ⭐ 먼저 시간대 랜덤
+  timeOfDay = random(times); // ⭐ 시간대 랜덤 선택
 
-  setTimeColors(); // ⭐ 이 시간대에 맞는 컬러 세팅
+  setTimeColors(); // ⭐ 테마 색상 세팅
 
+  // ⭐ 별똥별 여부
   if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
-    hasShootingStars = random() < 0.7; // ⭐ 시간대 기반으로 별똥별 70% 확률
+    hasShootingStars = random() < 0.7;
   } else {
     hasShootingStars = false;
   }
 
+  // ⭐ 수평선 위치 설정
   if (["turquoise", "mediterranean", "golden"].includes(timeOfDay)) {
     horizonRatio = 0.45;
   } else if (["sunset", "twilight", "blush"].includes(timeOfDay)) {
@@ -60,6 +62,7 @@ function setup() {
     horizonRatio = 0.5;
   }
 
+  // ⭐ 파도 색상 팔레트 생성
   for (let i = 0; i < 6; i++) {
     palette.push(
       color(
@@ -74,12 +77,21 @@ function setup() {
   createClouds();
   createShipTrail();
 
-  if (["night", "twilight", "stormy"].includes(timeOfDay)) {
+  // ⭐ 달 조건: 비오는 밤 포함
+  if (["night", "twilight", "stormy", "rainyNight"].includes(timeOfDay)) {
     moonPhase = random(["crescent", "half", "gibbous", "full", "new"]);
     moonShapeIndex = floor(random(3));
     moonPos = createVector(random(width * 0.3, width * 0.7), height * 0.2);
   }
 
+  // ⭐ 비오는 밤 전용 효과
+  if (timeOfDay === "rainyNight") {
+    hasShootingStars = false;
+    clearSky = false;
+    createRain(); // ← 따로 정의해둬야 함
+  }
+
+  // ⭐ 반짝이들
   let sparkleMinY = height * horizonRatio + 30;
   let sparkleMaxY = height * 0.92;
 
@@ -93,6 +105,7 @@ function setup() {
     });
   }
 
+  // ⭐ 별 추가 (밤 계열에만)
   const starTimes = ["night", "twilight", "stormy", "blush"];
   if (starTimes.includes(timeOfDay)) {
     let horizonY = height * horizonRatio;
@@ -107,10 +120,12 @@ function setup() {
     }
   }
 
+  // ⭐ 별똥별 초기 생성
   for (let i = 0; i < int(random(3, 5)); i++) {
     createShootingStar();
   }
 }
+
 
 function draw() {
   background(255);
@@ -127,7 +142,11 @@ function draw() {
   ) {
     drawRainbow();
   }
-
+  if (timeOfDay === "rainyNight") {
+    drawRain();
+    maybeFlashLightning();
+  }
+  
   updateClouds();
   drawClouds();
   drawOcean();
@@ -318,6 +337,16 @@ function setTimeColors() {
       sun: color(255, 180, 200, 220),
       sunPos: createVector(width * 0.5, height * 0.2),
     },
+    {
+      name: "rainyNight",
+      sky: [color(20, 20, 30), color(40, 40, 50), color(60, 60, 70)],
+      ocean: color(20, 50, 80),
+      shallow: color(40, 70, 100),
+      deep: color(10, 30, 60),
+      sand: color(50, 50, 60),
+      sun: color(180, 180, 200, 100), // 달빛 느낌
+      sunPos: createVector(width * 0.7, height * 0.15),
+    }
   ];
 
   let selected = themes.find(theme => theme.name === timeOfDay);
@@ -1079,6 +1108,56 @@ function createShootingStar() {
     vy: sin(angle) * speed,
     trail: [],
   });
+}
+let raindrops = [];
+
+function createRain() {
+  raindrops = [];
+  for (let i = 0; i < 300; i++) { // 개수는 자유롭게
+    raindrops.push({
+      x: random(width),
+      y: random(-height, 0), // 시작 y는 랜덤
+      speed: random(6, 12),  // 낙하 속도
+      length: random(10, 20), // 빗줄기 길이
+      thickness: random(1, 2), // 두께
+    });
+  }
+}
+function drawRain() {
+  let horizonY = height * horizonRatio;
+
+  for (let i = raindrops.length - 1; i >= 0; i--) {
+    let drop = raindrops[i];
+
+    // 비 이동
+    drop.y += drop.speed;
+
+    // 아래로 갈수록 더 진하게
+    let alpha = map(drop.y, 0, horizonY, 100, 255);
+
+    stroke(200, 220, 255, alpha); 
+    strokeWeight(drop.thickness);
+    line(drop.x, drop.y, drop.x, drop.y + drop.length);
+
+    // 수평선에 닿으면 그 비 입자는 삭제
+    if (drop.y >= horizonY) {
+      raindrops.splice(i, 1);
+    }
+  }
+}
+
+
+let lightningTimer = 0;
+
+function maybeFlashLightning() {
+  if (frameCount % 300 === 0 && random() < 0.3) {
+    lightningTimer = 5;
+  }
+
+  if (lightningTimer > 0) {
+    background(255, 255, 255, 40); // 살짝 번쩍이는 느낌
+    lightningTimer--;
+  }
 }
 
 function keyPressed() {
