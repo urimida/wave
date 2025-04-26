@@ -18,29 +18,39 @@ let waveParticleScale = 1; // 1이면 기본, <1 작음, >1 크게
 let turnAngle = 0;
 let moonPhase;
 let moonPos; // 달 위치
-let cloudDirection = random() < 0.5 ? "left" : "right"; // 방향 고정
+let cloudDirection;
+let clearSky = false; // 무지개 조건용
+let rainbowStyle;
+let rainbowCenterX;
+let shootingStars = [];
+let hasShootingStars = false;
+let shootingStarTimer = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   noStroke();
 
-  shipSpeed = random(1, 3);
+  cloudDirection = random() < 0.5 ? "left" : "right"; 
+  rainbowStyle = floor(random(1, 4));
+  rainbowCenterX = random(width * 0.4, width * 0.6);
+
+  shipSpeed = random(0.5, 1);
   let sizeMode = random(["medium", "large"]);
   waveParticleScale = sizeMode === "large" ? 2.3 : 1.8;
 
   const times = [
-    "morning",
-    "day",
-    "sunset",
-    "night",
-    "twilight",
-    "golden",
-    "turquoise",
-    "mediterranean",
-    "stormy",
-    "blush",
+    "morning", "day", "sunset", "night", "twilight", "golden",
+    "turquoise", "mediterranean", "stormy", "blush",
   ];
-  timeOfDay = random(times);
+  timeOfDay = random(times); // ⭐ 먼저 시간대 랜덤
+
+  setTimeColors(); // ⭐ 이 시간대에 맞는 컬러 세팅
+
+  if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
+    hasShootingStars = random() < 0.7; // ⭐ 시간대 기반으로 별똥별 70% 확률
+  } else {
+    hasShootingStars = false;
+  }
 
   if (["turquoise", "mediterranean", "golden"].includes(timeOfDay)) {
     horizonRatio = 0.45;
@@ -49,8 +59,6 @@ function setup() {
   } else {
     horizonRatio = 0.5;
   }
-
-  setTimeColors();
 
   for (let i = 0; i < 6; i++) {
     palette.push(
@@ -103,19 +111,19 @@ function setup() {
 function draw() {
   background(255);
   drawBackground();
-
-  if (
-    !["night", "twilight", "stormy"].includes(timeOfDay) &&
-    clouds.length === 0
-  ) {
-    drawRainbow();
-  }
   if (["night", "twilight", "stormy"].includes(timeOfDay)) {
     drawStars();
     drawMoon();
   } else {
     drawSun();
   }
+  if (
+    !["night", "twilight", "stormy"].includes(timeOfDay) &&
+    clouds.length === 0
+  ) {
+    drawRainbow();
+  }
+
   updateClouds();
   drawClouds();
   drawOcean();
@@ -133,7 +141,7 @@ function draw() {
       shipTrail.push({ x: shipPos.x, y: shipPos.y, life: 0 });
       shipPos.add(shipDirection);
     }
-  
+
     // 수평선 위쪽에 도달하면 수동 전환
     if (shipPos.y <= horizonY - 100) {
       isAutoShip = false;
@@ -149,7 +157,10 @@ function draw() {
       shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
     }
   }
-  
+  if (hasShootingStars) {
+    updateShootingStars();
+    drawShootingStars();
+  }
 
   drawShipTrail();
   drawBubbles();
@@ -186,11 +197,7 @@ function setTimeColors() {
   const themes = [
     {
       name: "morning",
-      sky: [
-        color(255, 240, 230),
-        color(255, 255, 220),
-        color(220, 250, 255),
-      ],
+      sky: [color(255, 240, 230), color(255, 255, 220), color(220, 250, 255)],
       ocean: color(140, 200, 230),
       shallow: color(200, 240, 230),
       deep: color(40, 120, 180),
@@ -200,11 +207,7 @@ function setTimeColors() {
     },
     {
       name: "day",
-      sky: [
-        color(200, 240, 255),
-        color(170, 220, 255),
-        color(120, 200, 255),
-      ],
+      sky: [color(200, 240, 255), color(170, 220, 255), color(120, 200, 255)],
       ocean: color(120, 190, 230),
       shallow: color(180, 235, 230),
       deep: color(50, 110, 180),
@@ -214,11 +217,7 @@ function setTimeColors() {
     },
     {
       name: "sunset",
-      sky: [
-        color(255, 150, 130),
-        color(255, 200, 160),
-        color(255, 240, 200),
-      ],
+      sky: [color(255, 150, 130), color(255, 200, 160), color(255, 240, 200)],
       ocean: color(200, 140, 160),
       shallow: color(255, 200, 170),
       deep: color(120, 90, 110),
@@ -228,11 +227,7 @@ function setTimeColors() {
     },
     {
       name: "night",
-      sky: [
-        color(30, 20, 60),
-        color(60, 30, 90),
-        color(100, 90, 80),
-      ],
+      sky: [color(30, 20, 60), color(60, 30, 90), color(100, 90, 80)],
       ocean: color(30, 70, 110),
       shallow: color(50, 90, 130),
       deep: color(20, 40, 80),
@@ -242,11 +237,7 @@ function setTimeColors() {
     },
     {
       name: "twilight",
-      sky: [
-        color(90, 40, 120),
-        color(180, 100, 160),
-        color(255, 210, 170),
-      ],
+      sky: [color(90, 40, 120), color(180, 100, 160), color(255, 210, 170)],
       ocean: color(70, 70, 120),
       shallow: color(90, 90, 150),
       deep: color(35, 35, 85),
@@ -256,12 +247,7 @@ function setTimeColors() {
     },
     {
       name: "golden",
-      sky: [
-        color(250, 220, 140),
-        color(255, 240, 180),
-        color(255, 250, 210),
-        color(240, 245, 250),
-      ],
+      sky: [color(250, 220, 140), color(255, 240, 180), color(255, 250, 210)],
       ocean: color(210, 190, 140),
       shallow: color(250, 220, 170),
       deep: color(190, 140, 110),
@@ -271,11 +257,7 @@ function setTimeColors() {
     },
     {
       name: "turquoise",
-      sky: [
-        color(255, 245, 200),
-        color(210, 250, 255),
-        color(100, 200, 255),
-      ],
+      sky: [color(255, 245, 200), color(210, 250, 255), color(100, 200, 255)],
       ocean: color(0, 220, 200),
       shallow: color(100, 255, 240),
       deep: color(0, 170, 180),
@@ -285,11 +267,7 @@ function setTimeColors() {
     },
     {
       name: "mediterranean",
-      sky: [
-        color(240, 250, 255),
-        color(255, 255, 245),
-        color(255, 250, 230),
-      ],
+      sky: [color(240, 250, 255), color(255, 255, 245), color(255, 250, 230)],
       ocean: color(100, 180, 210),
       shallow: color(160, 220, 230),
       deep: color(60, 130, 170),
@@ -299,11 +277,7 @@ function setTimeColors() {
     },
     {
       name: "stormy",
-      sky: [
-        color(30, 30, 40),
-        color(70, 70, 80),
-        color(120, 110, 100),
-      ],
+      sky: [color(30, 30, 40), color(70, 70, 80), color(120, 110, 100)],
       ocean: color(30, 60, 90),
       shallow: color(50, 80, 110),
       deep: color(10, 30, 60),
@@ -313,12 +287,7 @@ function setTimeColors() {
     },
     {
       name: "blush",
-      sky: [
-        color(255, 180, 200),
-        color(255, 220, 190),
-        color(255, 250, 220),
-        color(255, 255, 250),
-      ],
+      sky: [color(255, 180, 200), color(255, 220, 190), color(255, 250, 220)],
       ocean: color(230, 170, 190),
       shallow: color(250, 210, 220),
       deep: color(190, 110, 140),
@@ -328,8 +297,7 @@ function setTimeColors() {
     },
   ];
 
-  let selected = random(themes);
-  timeOfDay = selected.name;
+  let selected = themes.find(theme => theme.name === timeOfDay);
 
   skyColors = selected.sky;
   oceanBaseColor = selected.ocean;
@@ -338,12 +306,6 @@ function setTimeColors() {
   sandColor = selected.sand;
   sunColor = selected.sun;
   sunPos = selected.sunPos;
-
-  if (timeOfDay === "day") {
-    let horizonY = height * horizonRatio;
-    let minSunY = horizonY * 0.35;
-    sunPos.y = max(sunPos.y, minSunY);
-  }
 }
 
 
@@ -400,12 +362,24 @@ function createClouds() {
 
   let horizonY = height * horizonRatio;
 
-  // ✅ 수평선보다 더 위쪽으로 생성되도록 조정
+  // 수평선보다 더 위쪽으로 생성되도록 조정
   let minCloudY = height * 0.05;
-  let maxCloudY = horizonY * 0.55; // 기존 0.75 → 0.55 로 상향 조정
+  let maxCloudY = horizonY * 0.55; // 기존 0.75 →ss 0.55 로 상향 조정
 
-  // ✅ 구름 크기 반응형 & 절반 축소
+  // 구름 크기 반응형 & 절반 축소
   let baseScale = map(width, 500, 1500, 0.3, 0.65); // 기존보다 50% 작게
+
+  let allowClearSkyTimes = [
+    "day",
+    "morning",
+    "turquoise",
+    "golden",
+    "mediterranean",
+  ];
+  if (allowClearSkyTimes.includes(timeOfDay) && random() < 0.25) {
+    clearSky = true; // 무지개 조건에도 사용됨
+    return; // 구름 생성 안 함
+  }
 
   while (clouds.length < cloudCount && tries < 200) {
     let x = random(width * 0.1, width * 0.9);
@@ -444,7 +418,6 @@ function updateClouds() {
     }
   }
 }
-
 
 function addCloud(xPos) {
   let horizonY = height * horizonRatio;
@@ -498,7 +471,6 @@ function drawSingleCloud(c) {
   }
 }
 
-
 function drawSunOrMoon() {
   let isNightTime = ["night", "twilight", "stormy", "blush"].includes(
     timeOfDay
@@ -537,7 +509,10 @@ function drawSun() {
     for (let y = -50; y < 50; y += detail) {
       let d = dist(0, 0, x, y);
       if (d < 50) {
-        let n = noise((x + frameCount * 0.8) * 0.05, (y + frameCount * 0.8) * 0.05);
+        let n = noise(
+          (x + frameCount * 0.8) * 0.05,
+          (y + frameCount * 0.8) * 0.05
+        );
         let r = map(n, 0, 1, 220, 255);
         let g = map(n, 0, 1, 150, 200);
         let b = map(n, 0, 1, 80, 120);
@@ -576,7 +551,10 @@ function drawMoon() {
     for (let y = -250; y < 250; y += detail) {
       let d = dist(0, 0, x, y);
       if (d < 250) {
-        let n = noise((x + frameCount * 0.1) * 0.01, (y + frameCount * 0.1) * 0.01);
+        let n = noise(
+          (x + frameCount * 0.1) * 0.01,
+          (y + frameCount * 0.1) * 0.01
+        );
         let bright = map(n, 0, 1, 220, 255);
         fill(bright, bright, 255, 8); // 옅은 점으로 텍스처 느낌
         ellipse(x, y, detail * 1.2);
@@ -586,7 +564,6 @@ function drawMoon() {
 
   pop();
 }
-
 
 function drawOcean() {
   drawWaveParticles();
@@ -678,18 +655,23 @@ function drawShipTrail() {
     }
   }
 
-  // ✅ 흔적 제거 조건 추가
+  // ✅ 흔적 제거 조건 강화
   for (let i = shipTrail.length - 1; i >= 0; i--) {
     let p = shipTrail[i];
     p.life++;
 
-    let outOfScreen =
+    const isOffscreen =
       p.x < -100 || p.x > width + 100 || p.y < -100 || p.y > height + 100;
+    const isMouseTrail = !isAutoShip;
+    const isOutOfMouseRange =
+      isMouseTrail &&
+      (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height);
 
     if (
       p.life > 300 ||
       p.y <= height * horizonRatio - 20 ||
-      outOfScreen
+      isOffscreen ||
+      isOutOfMouseRange
     ) {
       shipTrail.splice(i, 1);
     }
@@ -773,19 +755,17 @@ function drawBubbles() {
   }
 }
 
-
 function createShipTrail() {
   shipPos = createVector(random(width * 0.3, width * 0.7), height + 50);
   let angle = random(-PI / 3, (-2 * PI) / 3);
   shipDirection = p5.Vector.fromAngle(angle).normalize().mult(shipSpeed);
 }
 
-
 function drawCloudStyle1(x, y, scaleVal = 1, alpha = 255) {
   push();
   translate(x, y);
   scale(scaleVal);
-    drawingContext.filter = "blur(12px)";
+  drawingContext.filter = "blur(12px)";
   fill(255, 255, 255, alpha);
   noStroke();
   beginShape();
@@ -809,7 +789,7 @@ function drawCloudStyle2(x, y, scaleVal = 1, alpha = 255) {
   scale(scaleVal);
   drawingContext.filter = "blur(12px)";
   fill(255, 255, 255, alpha);
-  
+
   noStroke();
   beginShape();
   vertex(214, 130);
@@ -852,7 +832,11 @@ function drawCloudStyle3(x, y, scaleVal = 1, alpha = 255) {
 let rainbowBuffer = null;
 
 function drawRainbow() {
-  if (clouds.length > 0 || ["night", "twilight", "stormy", "sunset"].includes(timeOfDay)) return;
+  if (
+    clouds.length > 0 ||
+    ["night", "twilight", "stormy", "sunset"].includes(timeOfDay)
+  )
+    return;
 
   let horizonY = height * horizonRatio;
 
@@ -860,46 +844,210 @@ function drawRainbow() {
     rainbowBuffer = createGraphics(width, height);
     rainbowBuffer.noStroke();
 
-    let gradient = rainbowBuffer.drawingContext.createLinearGradient(width / 2, height * 0.1, width / 2, height * 0.6);
-    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.5)");
-    gradient.addColorStop(0.2644, "rgba(255, 178, 0, 0.5)");
-    gradient.addColorStop(0.4423, "rgba(255, 246, 0, 0.5)");
-    gradient.addColorStop(0.5865, "rgba(0, 255, 128, 0.5)");
-    gradient.addColorStop(0.7404, "rgba(45, 174, 255, 0.5)");
-    gradient.addColorStop(0.8942, "rgba(10, 0, 190, 0.5)");
-    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.5)");
+    let gradient = rainbowBuffer.drawingContext.createLinearGradient(
+      width / 2,
+      0,
+      width / 2,
+      horizonY
+    );
+
+    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.5)"); // 빨강
+    gradient.addColorStop(0.264423, "rgba(255, 179, 0, 0.5)"); // 주황
+    gradient.addColorStop(0.442308, "rgba(255, 247, 0, 0.5)"); // 노랑
+    gradient.addColorStop(0.586538, "rgba(0, 255, 128, 0.5)"); // 연두
+    gradient.addColorStop(0.740385, "rgba(45, 174, 255, 0.5)"); // 파랑
+    gradient.addColorStop(0.894231, "rgba(10, 0, 190, 0.5)"); // 남색
+    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.5)"); // 보라
+
     rainbowBuffer.drawingContext.fillStyle = gradient;
 
     rainbowBuffer.drawingContext.save();
     rainbowBuffer.drawingContext.filter = "blur(80px)";
 
-    let topOffset = height * 0.2; // 무지개 상단 높이 설정
-    let bottomY = horizonY;       // 무지개 하단을 수평선에 맞춤
-
-    rainbowBuffer.beginShape();
-    rainbowBuffer.vertex(width * 0.15, topOffset);
-    rainbowBuffer.bezierVertex(
-      width * 0.05, topOffset + (bottomY - topOffset) * 0.2,
-      width * 0.5, bottomY - (bottomY - topOffset) * 0.2,
-      width * 0.85, bottomY
-    );
-    rainbowBuffer.vertex(width * 0.85, bottomY);
-    rainbowBuffer.bezierVertex(
-      width * 0.85, bottomY - (bottomY - topOffset) * 0.5,
-      width * 0.45, topOffset * 0.8,
-      width * 0.15, topOffset
-    );
-    rainbowBuffer.endShape(CLOSE);
+    if (rainbowStyle === 1) {
+      drawRainbowStyle1(rainbowBuffer, horizonY, rainbowCenterX);
+    } else if (rainbowStyle === 2) {
+      drawRainbowStyle2(rainbowBuffer, horizonY, rainbowCenterX);
+    } else {
+      drawRainbowStyle3(rainbowBuffer, horizonY, rainbowCenterX);
+    }
 
     rainbowBuffer.drawingContext.restore();
   }
 
   push();
-  tint(255, 90); // 무지개 투명도
+  tint(255, 140);
   image(rainbowBuffer, 0, 0);
   noTint();
   pop();
 }
+
+function drawRainbowStyle1(pg, horizonY, centerX) {
+  pg.beginShape();
+  pg.vertex(centerX - width * 0.4, 0); // 시작점 더 바깥
+  pg.vertex(centerX - width * 0.7, 0); // 훨씬 바깥
+
+  pg.bezierVertex(
+    centerX - width * 0.8,
+    horizonY * 0.2, // 더 과장된 컨트롤 포인트
+    centerX - width * 0.1,
+    horizonY * 0.5,
+    centerX + width * 0.1,
+    horizonY * 0.7
+  );
+
+  pg.bezierVertex(
+    centerX + width * 0.6,
+    horizonY * 1.0,
+    centerX + width * 0.8,
+    horizonY * 0.8,
+    centerX + width * 0.6,
+    horizonY
+  );
+
+  pg.vertex(centerX + width * 0.6, horizonY);
+
+  pg.bezierVertex(
+    centerX + width * 0.4,
+    horizonY * 0.7,
+    centerX - width * 0.2,
+    horizonY * 0.3,
+    centerX - width * 0.4,
+    0
+  );
+  pg.endShape(CLOSE);
+}
+
+function drawRainbowStyle2(pg, horizonY, centerX) {
+  pg.beginShape();
+  pg.vertex(centerX + width * 0.4, 0);
+  pg.vertex(centerX + width * 0.7, 0);
+
+  pg.bezierVertex(
+    centerX + width * 0.8,
+    horizonY * 0.25,
+    centerX + width * 0.1,
+    horizonY * 0.55,
+    centerX - width * 0.1,
+    horizonY * 0.75
+  );
+
+  pg.bezierVertex(
+    centerX - width * 0.7,
+    horizonY * 1.05,
+    centerX - width * 0.9,
+    horizonY * 0.85,
+    centerX - width * 0.6,
+    horizonY
+  );
+
+  pg.vertex(centerX - width * 0.6, horizonY);
+
+  pg.bezierVertex(
+    centerX - width * 0.4,
+    horizonY * 0.7,
+    centerX + width * 0.2,
+    horizonY * 0.3,
+    centerX + width * 0.4,
+    0
+  );
+  pg.endShape(CLOSE);
+}
+function drawRainbowStyle3(pg, horizonY, centerX) {
+  pg.beginShape();
+  pg.vertex(centerX - width * 0.3, 0);
+  pg.vertex(centerX - width * 0.65, 0);
+
+  pg.bezierVertex(
+    centerX - width * 0.75,
+    horizonY * 0.2,
+    centerX + width * 0.75,
+    horizonY * 0.8,
+    centerX + width * 0.65,
+    horizonY
+  );
+
+  pg.vertex(centerX + width * 0.65, horizonY);
+
+  pg.bezierVertex(
+    centerX + width * 0.4,
+    horizonY * 0.6,
+    centerX - width * 0.4,
+    horizonY * 0.2,
+    centerX - width * 0.3,
+    0
+  );
+  pg.endShape(CLOSE);
+}
+
+function updateShootingStars() {
+  shootingStarTimer--;
+
+  if (shootingStarTimer <= 0) {
+    let numStars = floor(random(2, 8)); // 
+    for (let i = 0; i < numStars; i++) {
+      createShootingStar();
+    }
+    shootingStarTimer = int(random(40, 100)); // 다음 발사까지 대기 시간
+  }
+
+  // 별똥별 이동
+  for (let star of shootingStars) {
+    star.x += star.vx;
+    star.y += star.vy;
+    star.trail.push({ x: star.x, y: star.y, alpha: 255 });
+    if (star.trail.length > 20) {
+      star.trail.shift();
+    }
+  }
+
+  // 화면 벗어난 별똥별 제거
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    let star = shootingStars[i];
+    if (star.x > width + 100 || star.y > height + 100) {
+      shootingStars.splice(i, 1);
+    }
+  }
+}
+
+
+function drawShootingStars() {
+  noStroke();
+  for (let star of shootingStars) {
+    push();
+    drawingContext.shadowBlur = 20;
+    drawingContext.shadowColor = color(255, 240, 200, 180);
+
+    // 잔상 먼저 그리기
+    for (let t of star.trail) {
+      fill(255, 250, 200, t.alpha);
+      ellipse(t.x, t.y, 4, 4); // 기존보다 2배 크게
+      t.alpha *= 0.9; // 천천히 사라지게
+    }
+
+    // 본체 - 더 빛나게
+    fill(255, 255, 230, 250);
+    ellipse(star.x, star.y, 8, 8); // 기존보다 훨씬 크게 (4 → 8)
+    pop();
+  }
+}
+
+function createShootingStar() {
+  let startX = random(width * 0.1, width * 0.9);
+  let startY = random(height * 0.05, height * 0.3); // 조금 더 위쪽에서 시작
+
+  let angle = random(PI / 12, PI / 5); // 더 다양한 각도
+  let speed = random(6, 10); // 속도 약간 느리게 (몽환적으로)
+
+  shootingStars.push({
+    x: startX,
+    y: startY,
+    vx: cos(angle) * speed,
+    vy: sin(angle) * speed,
+    trail: [],
+  });
+}
+
 function keyPressed() {
   if (keyCode === LEFT_ARROW) {
     turnAngle = -0.05; // 왼쪽으로 회전
@@ -914,7 +1062,6 @@ function keyReleased() {
   }
 }
 
-
 function mouseMoved() {
   let horizonY = height * horizonRatio;
 
@@ -927,4 +1074,3 @@ function mouseMoved() {
     shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
   }
 }
-
