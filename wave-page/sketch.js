@@ -106,6 +106,10 @@ function setup() {
       });
     }
   }
+
+  for (let i = 0; i < int(random(3, 5)); i++) {
+    createShootingStar();
+  }
 }
 
 function draw() {
@@ -981,16 +985,6 @@ function drawRainbowStyle3(pg, horizonY, centerX) {
 }
 
 function updateShootingStars() {
-  shootingStarTimer--;
-
-  if (shootingStarTimer <= 0) {
-    let numStars = floor(random(2, 8)); // 
-    for (let i = 0; i < numStars; i++) {
-      createShootingStar();
-    }
-    shootingStarTimer = int(random(40, 100)); // 다음 발사까지 대기 시간
-  }
-
   // 별똥별 이동
   for (let star of shootingStars) {
     star.x += star.vx;
@@ -1001,15 +995,27 @@ function updateShootingStars() {
     }
   }
 
-  // 화면 벗어난 별똥별 제거
+  let horizonY = height * horizonRatio;
+
+  // 별똥별 삭제 + 삭제된 개수 세기
+  let removedCount = 0;
   for (let i = shootingStars.length - 1; i >= 0; i--) {
     let star = shootingStars[i];
-    if (star.x > width + 100 || star.y > height + 100) {
+    if (
+      star.x > width + 100 ||
+      star.y > height + 100 ||
+      star.y >= horizonY
+    ) {
       shootingStars.splice(i, 1);
+      removedCount++;
     }
   }
-}
 
+  // 삭제된 개수만큼 새로 만들기
+  for (let i = 0; i < removedCount; i++) {
+    createShootingStar();
+  }
+}
 
 function drawShootingStars() {
   noStroke();
