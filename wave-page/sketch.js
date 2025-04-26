@@ -201,14 +201,20 @@ function setTimeColors() {
   const themes = [
     {
       name: "morning",
-      sky: [color(255, 240, 230), color(255, 255, 220), color(220, 250, 255)],
-      ocean: color(140, 200, 230),
-      shallow: color(200, 240, 230),
-      deep: color(40, 120, 180),
-      sand: color(250, 240, 200),
-      sun: color(255, 240, 180, 220),
+      sky: [
+        color(180, 200, 255),   // 위: 보라+파랑 → 더 옅게 (밤기운은 최소)
+        color(255, 235, 200),   // 중간: 은은한 피치+노랑
+        color(255, 255, 230),   // 아래: 하얗게 번지는 아침 햇빛
+      ],
+      ocean: color(190, 220, 230),       // 전체적으로 더 밝고 부드러운 푸른 바다
+      shallow: color(230, 245, 230),     // 얕은 바다는 거의 하늘 반사 느낌
+      deep: color(100, 160, 200),        // 깊은 바다도 너무 어둡지 않게
+      sand: color(255, 245, 210),        // 햇살 받은 따뜻한 모래
+      sun: color(255, 240, 180, 240),    // 햇살 강조
       sunPos: createVector(width * 0.2, height * 0.25),
-    },
+    }
+    ,
+    
     {
       name: "day",
       sky: [color(200, 240, 255), color(170, 220, 255), color(120, 200, 255)],
@@ -221,13 +227,18 @@ function setTimeColors() {
     },
     {
       name: "sunset",
-      sky: [color(255, 150, 130), color(255, 200, 160), color(255, 240, 200)],
+      sky: [
+        color(230, 100, 130),   // 위: 보라+레드
+        color(255, 180, 120),   // 중간: 주황+노랑
+        color(255, 250, 210),   // 아래: 밝은 아이보리 → 햇빛 퍼짐 느낌
+      ],
       ocean: color(200, 140, 160),
       shallow: color(255, 200, 170),
       deep: color(120, 90, 110),
       sand: color(255, 220, 180),
       sun: color(255, 190, 120, 220),
       sunPos: createVector(width * 0.8, height * 0.3),
+  
     },
     {
       name: "night",
@@ -251,12 +262,16 @@ function setTimeColors() {
     },
     {
       name: "golden",
-      sky: [color(250, 220, 140), color(255, 240, 180), color(255, 250, 210)],
-      ocean: color(210, 190, 140),
-      shallow: color(250, 220, 170),
-      deep: color(190, 140, 110),
-      sand: color(255, 245, 190),
-      sun: color(255, 210, 120, 200),
+      sky: [
+        color(255, 220, 140), // 위쪽: 따뜻한 금빛 노랑
+        color(255, 240, 180), // 중간: 은은한 오렌지빛
+        color(255, 255, 250), // 아래쪽: 부드럽고 밝은 크림 화이트
+      ],
+      ocean: color(220, 180, 120),    // 바다도 조금 더 황금빛
+      shallow: color(240, 200, 150),  // 얕은 바다
+      deep: color(170, 130, 90),      // 깊은 바다는 황토 계열
+      sand: color(210, 160, 90),      // 모래는 진한 황토빛
+      sun: color(255, 220, 120, 230), // 햇살도 따뜻한 노랑
       sunPos: createVector(width * 0.3, height * 0.2),
     },
     {
@@ -271,14 +286,18 @@ function setTimeColors() {
     },
     {
       name: "mediterranean",
-      sky: [color(240, 250, 255), color(255, 255, 245), color(255, 250, 230)],
-      ocean: color(100, 180, 210),
-      shallow: color(160, 220, 230),
-      deep: color(60, 130, 170),
-      sand: color(250, 240, 200),
-      sun: color(255, 255, 190, 220),
-      sunPos: createVector(width * 0.6, height * 0.15),
-    },
+      sky: [
+        color(160, 210, 255),   // 위쪽: 쨍한 파랑
+        color(230, 240, 220),   // 중간: 약간 옅은 베이지빛으로 전이
+        color(255, 250, 200),   // 아래쪽: 태양빛에 물든 노란 아이보리
+      ],
+      ocean: color(40, 150, 200),       // 기존보다 살짝 밝게
+      shallow: color(130, 210, 200),    // 햇살 비침 감성
+      deep: color(20, 90, 150),         // 여전히 깊은 맛 유지      
+      sand: color(250, 240, 200),         // 바위보다 모래를 상징
+      sun: color(255, 255, 220, 230),     // 밝고 투명한 태양빛
+      sunPos: createVector(width * 0.65, height * 0.12),
+    },    
     {
       name: "stormy",
       sky: [color(30, 30, 40), color(70, 70, 80), color(120, 110, 100)],
@@ -311,7 +330,6 @@ function setTimeColors() {
   sunColor = selected.sun;
   sunPos = selected.sunPos;
 }
-
 
 function drawBackground() {
   let h = height;
@@ -868,13 +886,13 @@ function drawRainbow() {
       horizonY
     );
 
-    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.5)");
-    gradient.addColorStop(0.25, "rgba(255, 179, 0, 0.5)");
-    gradient.addColorStop(0.4, "rgba(255, 247, 0, 0.5)");
-    gradient.addColorStop(0.55, "rgba(0, 255, 128, 0.5)");
-    gradient.addColorStop(0.7, "rgba(45, 174, 255, 0.5)");
-    gradient.addColorStop(0.85, "rgba(10, 0, 190, 0.5)");
-    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.5)");
+    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.25)");
+    gradient.addColorStop(0.25, "rgba(255, 179, 0, 0.25)");
+    gradient.addColorStop(0.4, "rgba(255, 247, 0, 0.25)");
+    gradient.addColorStop(0.55, "rgba(0, 255, 128, 0.25)");
+    gradient.addColorStop(0.7, "rgba(45, 174, 255, 0.25)");
+    gradient.addColorStop(0.85, "rgba(10, 0, 190, 0.25)");
+    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.25)");
 
     rainbowBuffer.drawingContext.fillStyle = gradient;
 
@@ -889,7 +907,7 @@ function drawRainbow() {
 
   push();
   drawingContext.save();
-  drawingContext.filter = "blur(80px)"; // ⭐ 메인캔버스에 블러 적용
+  drawingContext.filter = "blur(90px)"; //  메인캔버스에 블러 적용
   image(rainbowBuffer, 0, 0);
   drawingContext.restore();
   pop();
