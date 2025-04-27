@@ -488,27 +488,34 @@ function updateClouds() {
     let buffer = 400 * c.s;
 
     if (c.vx > 0 && c.x - buffer > width) {
-      // 오른쪽으로 나간 경우
-      addCloud(-buffer, c);
+      // 오른쪽으로 나가면
       clouds.splice(i, 1);
+      addCloud(-buffer, c.s, c.alpha, c.style, c.vx); // 왼쪽 화면 바깥 - buffer
     } else if (c.vx < 0 && c.x + buffer < 0) {
-      // 왼쪽으로 나간 경우
-      addCloud(width + buffer, c);
+      // 왼쪽으로 나가면
       clouds.splice(i, 1);
+      addCloud(width + buffer, c.s, c.alpha, c.style, c.vx); // 오른쪽 화면 바깥 + buffer
     }
   }
 }
 
-function addCloud(xPos, prevCloud) {
+function addCloud(xPos, size, alpha, style, vx) {
+  let horizonY = height * horizonRatio;
+  let minY = height * 0.05;
+  let maxY = horizonY * 0.55; 
+
+  let y = random(minY, maxY); // y는 랜덤! (완전히 똑같은 위치 말고 자연스럽게)
+  
   clouds.push({
-    x: xPos,               // 위치만 반대편에
-    y: prevCloud.y,         // y 그대로
-    s: prevCloud.s,         // 크기 그대로
-    alpha: prevCloud.alpha, // 투명도 그대로
-    style: prevCloud.style, // 스타일 그대로
-    vx: prevCloud.vx,       // 방향/속도도 그대로
+    x: xPos,
+    y: y,
+    s: size,
+    alpha: alpha,
+    style: style,
+    vx: vx,
   });
 }
+
 
 function drawSingleCloud(c) {
   switch (c.style) {
