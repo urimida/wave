@@ -680,11 +680,19 @@ function drawWaveParticles() {
 function drawShipTrail() {
   noStroke();
   let horizonY = height * horizonRatio;
+  const deleteThreshold = horizonY - 5; // ★ 수평선보다 약간만 위까지 유지
 
   for (let i = 0; i < shipTrail.length; i++) {
     let p = shipTrail[i];
     let t = constrain(map(p.life, 0, 300, 0, 1), 0, 1);
-    let fadeFactor = constrain(map(p.y, horizonY + 50, horizonY, 1, 0), 0, 1);
+
+    // horizon 가까워질수록 alpha 부드럽게 줄이기
+    let fadeFactor = 1.0;
+    if (p.y < horizonY + 50) {
+      fadeFactor = map(p.y, deleteThreshold, horizonY + 50, 0, 1);
+    }
+    fadeFactor = constrain(fadeFactor, 0, 1);
+
     let alpha = lerp(100, 0, t) * fadeFactor;
 
     let w = lerp(30, 1000, t);
@@ -692,13 +700,13 @@ function drawShipTrail() {
     fill(255, 255, 255, alpha * 0.8);
     ellipse(p.x, p.y, w, h);
 
-    for (let i = 0; i < 50; i++) {
+    for (let j = 0; j < 50; j++) {
       let angle = random(TWO_PI);
       let dist = random(20, 60);
       let bx = p.x + cos(angle) * dist;
       let by = p.y + sin(angle) * dist;
       let r = random(6, 20);
-      let bAlpha = map(p.life, 0, 30, 80, 0);
+      let bAlpha = map(p.life, 0, 30, 80, 0) * fadeFactor;
       fill(255, 255, 255, bAlpha);
       ellipse(bx, by, r);
     }
@@ -723,7 +731,7 @@ function drawShipTrail() {
     }
   }
 
-  // ✅ 흔적 제거 조건 강화
+  // 흔적 삭제 조건
   for (let i = shipTrail.length - 1; i >= 0; i--) {
     let p = shipTrail[i];
     p.life++;
@@ -737,7 +745,7 @@ function drawShipTrail() {
 
     if (
       p.life > 300 ||
-      p.y <= height * horizonRatio - 20 ||
+      p.y <= deleteThreshold || // ★ 수평선 약간 아래에서 삭제
       isOffscreen ||
       isOutOfMouseRange
     ) {
