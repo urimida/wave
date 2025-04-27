@@ -187,6 +187,8 @@ function draw() {
 
   drawShipTrail();
   drawBubbles();
+  lightningBolts = lightningBolts.slice(-3); // 최근 3개만 유지
+
 }
 
 function drawSparkles() {
@@ -538,7 +540,7 @@ function drawSun() {
     ellipse(0, 0, radius);
   }
 
-  // ☀️ 태양 본체
+  // 태양 본체
   fill(255, 240, 150, 255);
   ellipse(0, 0, 100);
 
@@ -803,12 +805,20 @@ function createShipTrail() {
 function drawClouds() {
   push();
   drawingContext.save();
-  drawingContext.filter = "blur(23px)"; // ✅ 구름 전체에 23px 블러 적용
+  drawingContext.filter = "blur(23px)"; // 구름 전체에 23px 블러 적용
   for (let c of clouds) {
     drawSingleCloud(c);
-    drawSingleCloud({ ...c, x: c.x - width });
-    drawSingleCloud({ ...c, x: c.x + width });
+    push();
+    translate(-width, 0);
+    drawSingleCloud(c);
+    pop();
+    
+    push();
+    translate(width, 0);
+    drawSingleCloud(c);
+    pop();
   }
+  
   drawingContext.restore();
   pop();
 }
@@ -852,7 +862,7 @@ function drawCloudStyle2(x, y, scaleVal = 1, alpha = 255) {
   push();
   translate(x, y);
   scale(scaleVal);
-  fill(255, 255, 255, alpha); // ✅
+  fill(255, 255, 255, alpha); 
   noStroke();
   beginShape();
   vertex(214, 130);
@@ -891,8 +901,6 @@ function drawCloudStyle3(x, y, scaleVal = 1, alpha = 255) {
   endShape(CLOSE);
   pop();
 }
-
-
 
 let rainbowBuffer = null;
 
@@ -1135,28 +1143,66 @@ function drawRain() {
     // 아래로 갈수록 더 진하게
     let alpha = map(drop.y, 0, horizonY, 100, 255);
 
-    stroke(200, 220, 255, alpha); 
+    stroke(200, 220, 255, alpha);
     strokeWeight(drop.thickness);
     line(drop.x, drop.y, drop.x, drop.y + drop.length);
 
-    // 수평선에 닿으면 그 비 입자는 삭제
-    if (drop.y >= horizonY) {
-      raindrops.splice(i, 1);
+    // 수평선에 도달하면 다시 위로
+    if (drop.y > horizonY) {
+      drop.y = random(-100, 0);
+      drop.x = random(width);
+      drop.speed = random(6, 12);
+      drop.length = random(10, 20);
+      drop.thickness = random(1, 2);
     }
   }
 }
 
 
 let lightningTimer = 0;
-
+let lightningBolts = []; 
 function maybeFlashLightning() {
-  if (frameCount % 300 === 0 && random() < 0.3) {
-    lightningTimer = 5;
+  if (frameCount % 120 === 0 && random() < 0.7) {
+    lightningTimer = 10;
+    createLightningBolt();
   }
 
   if (lightningTimer > 0) {
-    background(255, 255, 255, 40); // 살짝 번쩍이는 느낌
+    background(255, 255, 255, 80);
+    drawLightningBolts();
     lightningTimer--;
+  }
+}
+
+
+function createLightningBolt() {
+  let startX = random(width * 0.3, width * 0.7);
+  let startY = 0;
+  let endY = height * horizonRatio * random(0.6, 0.9); // 수평선보다 살짝 위까지만
+
+  let bolt = [];
+  let x = startX;
+  let y = startY;
+  bolt.push({ x, y });
+
+  while (y < endY) {
+    x += random(-20, 20);
+    y += random(20, 40);
+    bolt.push({ x, y });
+  }
+
+  lightningBolts.push(bolt);
+}
+
+function drawLightningBolts() {
+  stroke(255);
+  strokeWeight(2);
+  for (let bolt of lightningBolts) {
+    beginShape();
+    for (let p of bolt) {
+      vertex(p.x, p.y);
+    }
+    endShape();
   }
 }
 
