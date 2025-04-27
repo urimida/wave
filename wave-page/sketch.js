@@ -454,23 +454,25 @@ function createClouds() {
 }
 
 function updateClouds() {
-  for (let i = 0; i < clouds.length; i++) {
+  for (let i = clouds.length - 1; i >= 0; i--) {
     let c = clouds[i];
     c.x += c.vx;
 
     let buffer = 400 * c.s;
 
-    // 오른쪽으로 나가면 왼쪽으로 순환
-    if (c.vx > 0 && c.x - buffer > width) {
-      c.x = -buffer;
+    // 오른쪽으로 완전히 벗어나면 삭제
+    if (c.vx > 0 && c.x - buffer > width + 100) {
+      clouds.splice(i, 1);
+      addCloud(-buffer); // 왼쪽 밖에서 새 구름 추가
     }
-
-    // 왼쪽으로 나가면 오른쪽으로 순환
-    if (c.vx < 0 && c.x + buffer < 0) {
-      c.x = width + buffer;
+    // 왼쪽으로 완전히 벗어나면 삭제
+    else if (c.vx < 0 && c.x + buffer < -100) {
+      clouds.splice(i, 1);
+      addCloud(width + buffer); // 오른쪽 밖에서 새 구름 추가
     }
   }
 }
+
 
 function addCloud(xPos) {
   let horizonY = height * horizonRatio;
