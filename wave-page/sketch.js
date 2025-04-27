@@ -454,25 +454,6 @@ function createClouds() {
   }
 }
 
-function updateClouds() {
-  for (let i = clouds.length - 1; i >= 0; i--) {
-    let c = clouds[i];
-    c.x += c.vx;
-
-    let buffer = 400 * c.s;
-
-    // 오른쪽으로 완전히 벗어나면
-    if (c.vx > 0 && c.x - buffer > width + 100) {
-      addCloud(-buffer, c); // ← 기존 구름 정보 넘겨서 새로 추가
-      clouds.splice(i, 1);
-    }
-    // 왼쪽으로 완전히 벗어나면
-    else if (c.vx < 0 && c.x + buffer < -100) {
-      addCloud(width + buffer, c); // ← 기존 구름 정보 넘겨서 새로 추가
-      clouds.splice(i, 1);
-    }
-  }
-}
 
 function drawClouds() {
   push();
@@ -499,34 +480,35 @@ function drawClouds() {
   pop();
 }
 
-function addCloud(xPos, prevCloud = null) {
-  if (prevCloud) {
-    // 기존 구름 복제해서 새로 추가
-    clouds.push({
-      x: xPos,
-      y: prevCloud.y,
-      s: prevCloud.s,
-      alpha: prevCloud.alpha,
-      style: prevCloud.style,
-      vx: prevCloud.vx,
-    });
-  } else {
-    // (혹시 처음 세팅용일 때 대비해서 기본 랜덤도 남겨둘게)
-    let horizonY = height * horizonRatio;
-    let minY = height * 0.05;
-    let maxY = horizonY * 0.9;
-    let baseScale = map(width, 500, 1500, 0.6, 1.3);
+function updateClouds() {
+  for (let i = clouds.length - 1; i >= 0; i--) {
+    let c = clouds[i];
+    c.x += c.vx;
 
-    let y = random(minY, maxY);
-    let s = random(1.0, 1.4) * baseScale;
-    let alpha = ["twilight", "night", "stormy"].includes(timeOfDay) ? 30 : 60;
-    let style = floor(random(3));
-    let vx = random(0.3, 0.6) * (random() < 0.5 ? 1 : -1);
+    let buffer = 400 * c.s;
 
-    clouds.push({ x: xPos, y, s, alpha, style, vx });
+    if (c.vx > 0 && c.x - buffer > width) {
+      // 오른쪽으로 나간 경우
+      addCloud(-buffer, c);
+      clouds.splice(i, 1);
+    } else if (c.vx < 0 && c.x + buffer < 0) {
+      // 왼쪽으로 나간 경우
+      addCloud(width + buffer, c);
+      clouds.splice(i, 1);
+    }
   }
 }
 
+function addCloud(xPos, prevCloud) {
+  clouds.push({
+    x: xPos,               // 위치만 반대편에
+    y: prevCloud.y,         // y 그대로
+    s: prevCloud.s,         // 크기 그대로
+    alpha: prevCloud.alpha, // 투명도 그대로
+    style: prevCloud.style, // 스타일 그대로
+    vx: prevCloud.vx,       // 방향/속도도 그대로
+  });
+}
 
 function drawSingleCloud(c) {
   switch (c.style) {
