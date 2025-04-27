@@ -397,6 +397,7 @@ function drawBackground() {
   }
 }
 
+
 function drawStars() {
   noStroke();
   for (let i = 0; i < stars.length; i++) {
@@ -473,6 +474,30 @@ function updateClouds() {
   }
 }
 
+function drawClouds() {
+  push();
+  drawingContext.save();
+  drawingContext.filter = "blur(23px)"; // 구름 전체 블러
+
+  for (let c of clouds) {
+    push(); // 각각 구름마다 push
+    drawSingleCloud(c);
+    pop();
+
+    push();
+    translate(-width, 0);
+    drawSingleCloud(c);
+    pop();
+
+    push();
+    translate(width, 0);
+    drawSingleCloud(c);
+    pop();
+  }
+
+  drawingContext.restore();
+  pop();
+}
 
 function addCloud(xPos) {
   let horizonY = height * horizonRatio;
@@ -802,27 +827,6 @@ function createShipTrail() {
   shipPos = createVector(random(width * 0.3, width * 0.7), height + 50);
   let angle = random(-PI / 3, (-2 * PI) / 3);
   shipDirection = p5.Vector.fromAngle(angle).normalize().mult(shipSpeed);
-}
-
-function drawClouds() {
-  push();
-  drawingContext.save();
-  drawingContext.filter = "blur(23px)"; // 구름 전체에 23px 블러 적용
-  for (let c of clouds) {
-    drawSingleCloud(c);
-    push();
-    translate(-width, 0);
-    drawSingleCloud(c);
-    pop();
-    
-    push();
-    translate(width, 0);
-    drawSingleCloud(c);
-    pop();
-  }
-  
-  drawingContext.restore();
-  pop();
 }
 
 function drawSingleCloud(c) {
