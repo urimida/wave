@@ -129,28 +129,33 @@ function setup() {
 
 function draw() {
   background(255);
+
   drawBackground();
+
   if (["night", "twilight", "stormy"].includes(timeOfDay)) {
     drawStars();
     drawMoon();
   } else {
     drawSun();
   }
-  if (
-    !["night", "twilight", "stormy"].includes(timeOfDay) &&
-    clouds.length === 0
-  ) {
+
+  if (!["night", "twilight", "stormy"].includes(timeOfDay) && clouds.length === 0) {
     drawRainbow();
   }
+
   if (timeOfDay === "rainyNight") {
     drawRain();
     maybeFlashLightning();
   }
-  
+
   updateClouds();
   drawClouds();
   drawOcean();
   drawSparkles();
+  
+  updateAndDrawFireworks();     // 추가
+  updateAndDrawBirds();         // 추가
+
 
   let horizonY = height * horizonRatio;
 
@@ -164,22 +169,15 @@ function draw() {
       shipTrail.push({ x: shipPos.x, y: shipPos.y, life: 0 });
       shipPos.add(shipDirection);
     }
-
-    // 수평선 위쪽에 도달하면 수동 전환
     if (shipPos.y <= horizonY - 100) {
       isAutoShip = false;
     }
   } else {
-    // 마우스가 화면 안에 있고, 수평선 아래에 있을 때만 흔적 추가
-    if (
-      mouseX >= 0 &&
-      mouseX <= width &&
-      mouseY >= horizonY &&
-      mouseY <= height
-    ) {
+    if (mouseX >= 0 && mouseX <= width && mouseY >= horizonY && mouseY <= height) {
       shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
     }
   }
+
   if (hasShootingStars) {
     updateShootingStars();
     drawShootingStars();
@@ -187,8 +185,8 @@ function draw() {
 
   drawShipTrail();
   drawBubbles();
-  lightningBolts = lightningBolts.slice(-3); // 최근 3개만 유지
 
+  lightningBolts = lightningBolts.slice(-3);
 }
 
 function drawSparkles() {
@@ -1178,12 +1176,139 @@ function drawLightningBolts() {
     endShape();
   }
 }
+let fireworks = [];
+
+function triggerFireworks() {
+  for (let i = 0; i < 5; i++) {
+    let mainColors = [
+      [255, 150, 200], // 핑크
+      [255, 100, 180], // 핑크-퍼플
+      [255, 170, 130], // 살구색
+      [255, 200, 230], // 연분홍
+      [200, 150, 255], // 연보라
+    ];
+
+    let subColors = [
+      [255, 230, 100], // 노랑
+      [255, 180, 120], // 오렌지
+      [255, 255, 255], // 하양
+      [200, 220, 255], // 푸른빛 하양
+      [255, 190, 220], // 연핑크
+    ];
+
+    let main = random(mainColors);
+    let sub = random(subColors);
+
+    fireworks.push({
+      x: random(width * 0.2, width * 0.8),
+      y: random(height * 0.1, height * 0.4),
+      mainColor: main,
+      subColor: sub,
+      particles: [],
+      life: 0,
+      sizeFactor: random(1.2, 2.8) // 작은 것도 있고 큰 것도 있게
+    });
+  }
+}
+
+function updateAndDrawFireworks() {
+  for (let f of fireworks) {
+    if (f.particles.length === 0) {
+      let particleCount = int(random(100, 180));
+      for (let i = 0; i < particleCount; i++) {
+        let angle = random(TWO_PI);
+        let speed = random(2, 7);
+        f.particles.push({
+          x: 0,
+          y: 0,
+          vx: cos(angle) * speed,
+          vy: sin(angle) * speed,
+          radius: random(3, 7),
+          colorMix: random() < 0.7 ? "main" : "sub" // 메인 중심, 가끔 서브
+        });
+      }
+    }
+
+    push();
+    translate(f.x, f.y);
+    noStroke();
+    for (let p of f.particles) {
+      let alpha = map(f.life, 0, 100, 255, 0);
+
+      let baseColor = p.colorMix === "main" ? f.mainColor : f.subColor;
+
+      // Glow (바깥 퍼짐)
+      fill(baseColor[0], baseColor[1], baseColor[2], alpha * 0.08);
+      ellipse(p.x, p.y, p.radius * f.sizeFactor * 5);
+
+      // 알맹이
+      fill(baseColor[0], baseColor[1], baseColor[2], alpha);
+      ellipse(p.x, p.y, p.radius * f.sizeFactor);
+
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.vy += 0.04;
+    }
+    pop();
+
+    f.life++;
+
+    if (f.life > 100) {
+      f.toRemove = true;
+    }
+  }
+
+  fireworks = fireworks.filter(f => !f.toRemove);
+}
+
+
+let birds = [];
+
+function triggerBirdFlock() {
+  for (let i = 0; i < 20; i++) {
+    birds.push({
+      x: random(width),
+      y: random(height * 0.1, height * 0.4),
+      vx: random(2, 5),
+      vy: random(-1, 1),
+      size: random(8, 15),
+      life: 0
+    });
+  }
+}
+
+function updateAndDrawBirds() {
+  noStroke();
+  fill(30);
+  for (let b of birds) {
+    ellipse(b.x, b.y, b.size, b.size * 0.6);
+    b.x += b.vx;
+    b.y += b.vy + sin(frameCount * 0.1 + b.x * 0.05) * 1.5;
+    b.life++;
+  }
+  birds = birds.filter(b => b.x < width + 50 && b.life < 200);
+}
 
 function keyPressed() {
   if (keyCode === LEFT_ARROW) {
-    turnAngle = -0.05; // 왼쪽으로 회전
+    turnAngle = -0.05;
   } else if (keyCode === RIGHT_ARROW) {
-    turnAngle = 0.05; // 오른쪽으로 회전
+    turnAngle = 0.05;
+  } else {
+    let k = key.toLowerCase();
+    if (k === 'f') {
+      triggerFireworks();
+    } else if (k === 's') {
+      triggerSparklingWater();
+    } else if (k === 'b') {
+      triggerBirdFlock();
+    } else if (k === 'r') {
+      triggerRainbow();
+    } else if (k === 'j') {
+      triggerJellyfish();
+    }
   }
 }
 
@@ -1192,6 +1317,13 @@ function keyReleased() {
     turnAngle = 0;
   }
 }
+
+function keyReleased() {
+  if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
+    turnAngle = 0;
+  }
+}
+
 
 function mouseMoved() {
   let horizonY = height * horizonRatio;
