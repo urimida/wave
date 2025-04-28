@@ -44,14 +44,10 @@ function setup() {
   ];
   timeOfDay = random(times); // 시간대 랜덤 선택
 
-  setTimeColors(); // ⭐ 테마 색상 세팅
+  setTimeColors(); // 테마 색상 세팅
 
   // 별똥별 여부
-  if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
-    hasShootingStars = random() < 0.7;
-  } else {
-    hasShootingStars = false;
-  }
+  hasShootingStars = ["night", "twilight", "stormy", "blush"].includes(timeOfDay) && random() < 0.7;
 
   // 수평선 위치 설정
   if (["turquoise", "mediterranean", "golden"].includes(timeOfDay)) {
@@ -63,6 +59,7 @@ function setup() {
   }
 
   // 파도 색상 팔레트 생성
+  palette = [];
   for (let i = 0; i < 6; i++) {
     palette.push(
       color(
@@ -74,41 +71,40 @@ function setup() {
     );
   }
 
-  createClouds();
+  createClouds();  // Cloud 인스턴스로 채워진 clouds 배열
   createShipTrail();
 
-  // 달 조건: 비오는 밤 포함
+  // 달 설정
   if (["night", "twilight", "stormy", "rainyNight"].includes(timeOfDay)) {
     moonPhase = random(["crescent", "half", "gibbous", "full", "new"]);
     moonShapeIndex = floor(random(3));
     moonPos = createVector(random(width * 0.3, width * 0.7), height * 0.2);
   }
 
-  // 비오는 밤 전용 효과
+  // 비오는 밤
   if (timeOfDay === "rainyNight") {
     hasShootingStars = false;
     clearSky = false;
-    createRain(); // ← 따로 정의해둬야 함
+    createRain();
   }
 
-  // 반짝이들
+  // 반짝이
+  sparkles = [];
   let sparkleMinY = height * horizonRatio + 30;
   let sparkleMaxY = height * 0.92;
-
-  for (let i = 0; i < 130; i++) { // ⭐ 개수 130개 정도로 늘리기
+  for (let i = 0; i < 130; i++) {
     sparkles.push({
       x: random(width * 0.05, width * 0.95),
       y: random(sparkleMinY, sparkleMaxY),
-      size: random(0.4, 1.0), // ⭐ 훨씬 작게
+      size: random(0.4, 1.0),
       alpha: random(100, 180),
       flicker: random(0.08, 0.18),
     });
   }
-  
 
-  // 별 추가 (밤 계열에만)
-  const starTimes = ["night", "twilight", "stormy", "blush"];
-  if (starTimes.includes(timeOfDay)) {
+  // 별
+  stars = [];
+  if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
     let horizonY = height * horizonRatio;
     for (let i = 0; i < 150; i++) {
       stars.push({
@@ -121,7 +117,8 @@ function setup() {
     }
   }
 
-  // 별똥별 초기 생성
+  // 별똥별
+  shootingStars = [];
   for (let i = 0; i < int(random(3, 5)); i++) {
     createShootingStar();
   }
@@ -139,7 +136,7 @@ function draw() {
     drawSun();
   }
 
-  if (!["night", "twilight", "stormy"].includes(timeOfDay) && clouds.length === 0) {
+  if (!["night", "twilight", "stormy"].includes(timeOfDay) && clearSky) {
     drawRainbow();
   }
 
@@ -148,15 +145,13 @@ function draw() {
     maybeFlashLightning();
   }
 
-  updateClouds();
+  updateClouds();  // ✅ clouds 배열은 Cloud 객체로 되어있음
   drawClouds();
+
   drawOcean();
   drawSparkles();
-  
-  updateAndDrawFireworks();     // 추가
-  updateAndDrawBirds();         // 추가
 
-
+  // 배 이동
   let horizonY = height * horizonRatio;
 
   shipDirection.rotate(turnAngle);
@@ -173,7 +168,7 @@ function draw() {
       isAutoShip = false;
     }
   } else {
-    if (mouseX >= 0 && mouseX <= width && mouseY >= horizonY && mouseY <= height) {
+    if (mouseX >= 0 && mouseY >= horizonY && mouseX <= width && mouseY <= height) {
       shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
     }
   }
@@ -185,8 +180,10 @@ function draw() {
 
   drawShipTrail();
   drawBubbles();
+  updateAndDrawFireworks();
+  updateAndDrawFish();
 
-  lightningBolts = lightningBolts.slice(-3);
+  lightningBolts = lightningBolts.slice(-3); // 번개 개수 관리
 }
 
 function drawSparkles() {
@@ -407,7 +404,76 @@ function drawStars() {
     ellipse(starX, star.y, star.size);
   }
 }
+class Cloud {
+  constructor(x, y, s, alpha, style, vx) {
+    this.x = x;
+    this.y = y;
+    this.s = s;
+    this.alpha = alpha;
+    this.style = style;
+    this.vx = vx;
+  }
 
+  update() {
+    this.x += this.vx;
+    if (this.x < -width * 0.5) {
+      this.x = width + width * 0.5;
+    } else if (this.x > width + width * 0.5) {
+      this.x = -width * 0.5;
+    }
+  }
+
+  draw(offsetX = 0) {
+    push();
+    translate(this.x + offsetX, this.y);
+    scale(this.s);
+    fill(255, 255, 255, this.alpha);
+    noStroke();
+    beginShape();
+    switch (this.style) {
+      case 0:
+        vertex(287, 175);
+        bezierVertex(287, 175, 43, 175, 43, 175);
+        bezierVertex(28.6667, 167.5, 0, 144, 0, 110);
+        bezierVertex(0, 76, 35, 67.5, 52.5, 67.5);
+        bezierVertex(55.1667, 45, 72.2, 0.2, 119, 1);
+        bezierVertex(165.8, 1.8, 177.833, 37, 178, 54.5);
+        bezierVertex(180, 49.333, 191.3, 40.4, 220.5, 46);
+        bezierVertex(249.7, 51.6, 262.667, 80, 265.5, 93.5);
+        bezierVertex(285.333, 89.833, 324.5, 91.6, 322.5, 128);
+        bezierVertex(320.5, 164.4, 298, 174.5, 287, 175);
+        break;
+      case 1:
+        vertex(214, 130);
+        bezierVertex(214, 130, 27, 130, 27, 130);
+        bezierVertex(15.833, 126.333, -4.9, 112, 1.5, 84);
+        bezierVertex(7.9, 56, 31.5, 56.667, 42.5, 60.5);
+        bezierVertex(37.333, 54, 31.4, 37.6, 49, 24);
+        bezierVertex(66.6, 10.4, 86, 21.333, 93.5, 28.5);
+        bezierVertex(96.833, 17, 109.6, -4.5, 134, 1.5);
+        bezierVertex(158.4, 7.5, 159.833, 27.667, 157.5, 37);
+        bezierVertex(159, 31.333, 167, 20.7, 187, 23.5);
+        bezierVertex(207, 26.3, 209, 47.666, 207.5, 58);
+        bezierVertex(217.5, 53, 251, 63, 248, 95);
+        bezierVertex(245.6, 120.6, 224.333, 129, 214, 130);
+        break;
+      case 2:
+        vertex(225, 130.5);
+        bezierVertex(225, 130.5, 34, 130.5, 34, 130.5);
+        bezierVertex(21, 129.5, -3.8, 119.8, 1, 89);
+        bezierVertex(5.8, 58.2, 35, 54.833, 49, 57);
+        bezierVertex(47.5, 49.167, 50.5, 32.5, 74.5, 28.5);
+        bezierVertex(98.5, 24.5, 108.833, 37.167, 111, 44);
+        bezierVertex(112.167, 31.167, 121.6, 4.6, 150, 1);
+        bezierVertex(191.6, -3.8, 208.333, 23.334, 211.5, 37.5);
+        bezierVertex(218, 31.5, 269.5, 41, 268, 83.5);
+        bezierVertex(266.8, 117.5, 238.833, 129, 225, 130.5);
+        break;
+    }
+    endShape(CLOSE);
+    pop();
+  }
+}
 function createClouds() {
   clouds = [];
   let cloudCount = random(15, 25);
@@ -415,12 +481,10 @@ function createClouds() {
 
   let horizonY = height * horizonRatio;
 
-  // 수평선보다 더 위쪽으로 생성되도록 조정
   let minCloudY = height * 0.05;
-  let maxCloudY = horizonY * 0.55; // 기존 0.75 →ss 0.55 로 상향 조정
+  let maxCloudY = horizonY * 0.55;
 
-  // 구름 크기 반응형 & 절반 축소
-  let baseScale = map(width, 500, 1500, 0.3, 0.65); // 기존보다 50% 작게
+  let baseScale = map(width, 500, 1500, 0.3, 0.65);
 
   let allowClearSkyTimes = [
     "day",
@@ -430,8 +494,8 @@ function createClouds() {
     "mediterranean",
   ];
   if (allowClearSkyTimes.includes(timeOfDay) && random() < 0.25) {
-    clearSky = true; // 무지개 조건에도 사용됨
-    return; // 구름 생성 안 함
+    clearSky = true;
+    return;
   }
 
   while (clouds.length < cloudCount && tries < 200) {
@@ -448,38 +512,32 @@ function createClouds() {
     let style = floor(random(3));
     let vx = random(0.3, 0.6) * (random() < 0.5 ? 1 : -1);
 
-    clouds.push({ x, y, s, alpha, style, vx });
+    clouds.push(new Cloud(x, y, s, alpha, style, vx));
     tries++;
   }
 }
 
+function updateClouds() {
+  for (let c of clouds) {
+    c.x += c.vx;
+
+  }
+}
+
+
 function drawClouds() {
   push();
   drawingContext.save();
-  drawingContext.filter = "blur(23px)"; // 블러 효과
+  drawingContext.filter = "blur(23px)";
 
   for (let c of clouds) {
     for (let offset = -1; offset <= 1; offset++) {
-      push();
-      translate(c.x + offset * width, c.y); // x축 복제 (-width, 0, +width)
-      drawSingleCloud({x: 0, y: 0, s: c.s, alpha: c.alpha, style: c.style});
-      pop();
+      c.draw(offset * width); // ✔️ Cloud 클래스 안 draw(offsetX) 지원하는 버전
     }
   }
 
   drawingContext.restore();
   pop();
-}
-function updateClouds() {
-  for (let c of clouds) {
-    c.x += c.vx;
-
-    if (c.x < -width * 0.5) { 
-      c.x = width + width * 0.5; // 왼쪽으로 너무 나가면 오른쪽 끝으로 이동
-    } else if (c.x > width + width * 0.5) {
-      c.x = -width * 0.5; // 오른쪽으로 너무 나가면 왼쪽 끝으로 이동
-    }
-  }
 }
 
 function drawSingleCloud(c) {
@@ -493,6 +551,57 @@ function drawSingleCloud(c) {
     case 2:
       drawCloudStyle3(c.x, c.y, c.s, c.alpha);
       break;
+  }
+}
+class Sparkle {
+  constructor(x, y, size, alpha, flicker) {
+    this.x = x;
+    this.y = y;
+    this.size = size;
+    this.alpha = alpha;
+    this.flicker = flicker;
+  }
+
+  draw() {
+    let flickerValue = sin(frameCount * this.flicker + this.x * 0.1) * 100;
+    let a = constrain(this.alpha + flickerValue, 0, 255);
+    let offsetX = sin(frameCount * 0.01 + this.y * 0.05) * 3;
+    let offsetY = cos(frameCount * 0.01 + this.x * 0.05) * 1.5;
+    let sizePulse = sin(frameCount * 0.02 + this.x * 0.5) * 0.2 + 1;
+
+    noStroke();
+    fill(255, 255, 255, a * 0.12);
+    ellipse(this.x + offsetX, this.y + offsetY, this.size * 80 * sizePulse, this.size * 30 * sizePulse);
+
+    fill(255, 255, 255, a * 0.5);
+    ellipse(this.x + offsetX, this.y + offsetY, this.size * 14 * sizePulse);
+
+    fill(255, 240, 180, a * 0.3);
+    ellipse(this.x + offsetX, this.y + offsetY, this.size * 35 * sizePulse);
+
+    if (random() < 0.08) {
+      fill(255, 255, 255, a);
+      ellipse(this.x + offsetX + random(-2, 2), this.y + offsetY + random(-2, 2), this.size * 3);
+    }
+  }
+}
+class Star {
+  constructor(x, y, size, alpha, blinkSpeed) {
+    this.x = x;
+    this.y = y;
+    this.size = size;
+    this.alpha = alpha;
+    this.blinkSpeed = blinkSpeed;
+  }
+
+  draw() {
+    let flicker = sin(frameCount * 0.05 * this.blinkSpeed) * 50;
+    let a = constrain(this.alpha + flicker, 120, 255);
+    let starX = (this.x + frameCount * 0.01) % width;
+
+    noStroke();
+    fill(255, 255, 255, a);
+    ellipse(starX, this.y, this.size);
   }
 }
 
@@ -794,84 +903,6 @@ function createShipTrail() {
   shipDirection = p5.Vector.fromAngle(angle).normalize().mult(shipSpeed);
 }
 
-function drawSingleCloud(c) {
-  switch (c.style) {
-    case 0:
-      drawCloudStyle1(c.x, c.y, c.s, c.alpha);
-      break;
-    case 1:
-      drawCloudStyle2(c.x, c.y, c.s, c.alpha);
-      break;
-    case 2:
-      drawCloudStyle3(c.x, c.y, c.s, c.alpha);
-      break;
-  }
-}
-
-function drawCloudStyle1(x, y, scaleVal = 1, alpha = 255) {
-  push();
-  translate(x, y);
-  scale(scaleVal);
-  fill(255, 255, 255, alpha); // ✅ 블러는 밖에서 먹이니까 여기선 fill만
-  noStroke();
-  beginShape();
-  vertex(287, 175);
-  bezierVertex(287, 175, 43, 175, 43, 175);
-  bezierVertex(28.6667, 167.5, 0, 144, 0, 110);
-  bezierVertex(0, 76, 35, 67.5, 52.5, 67.5);
-  bezierVertex(55.1667, 45, 72.2, 0.2, 119, 1);
-  bezierVertex(165.8, 1.8, 177.833, 37, 178, 54.5);
-  bezierVertex(180, 49.333, 191.3, 40.4, 220.5, 46);
-  bezierVertex(249.7, 51.6, 262.667, 80, 265.5, 93.5);
-  bezierVertex(285.333, 89.833, 324.5, 91.6, 322.5, 128);
-  bezierVertex(320.5, 164.4, 298, 174.5, 287, 175);
-  endShape(CLOSE);
-  pop();
-}
-
-function drawCloudStyle2(x, y, scaleVal = 1, alpha = 255) {
-  push();
-  translate(x, y);
-  scale(scaleVal);
-  fill(255, 255, 255, alpha); 
-  noStroke();
-  beginShape();
-  vertex(214, 130);
-  bezierVertex(214, 130, 27, 130, 27, 130);
-  bezierVertex(15.833, 126.333, -4.9, 112, 1.5, 84);
-  bezierVertex(7.9, 56, 31.5, 56.667, 42.5, 60.5);
-  bezierVertex(37.333, 54, 31.4, 37.6, 49, 24);
-  bezierVertex(66.6, 10.4, 86, 21.333, 93.5, 28.5);
-  bezierVertex(96.833, 17, 109.6, -4.5, 134, 1.5);
-  bezierVertex(158.4, 7.5, 159.833, 27.667, 157.5, 37);
-  bezierVertex(159, 31.333, 167, 20.7, 187, 23.5);
-  bezierVertex(207, 26.3, 209, 47.666, 207.5, 58);
-  bezierVertex(217.5, 53, 251, 63, 248, 95);
-  bezierVertex(245.6, 120.6, 224.333, 129, 214, 130);
-  endShape(CLOSE);
-  pop();
-}
-
-function drawCloudStyle3(x, y, scaleVal = 1, alpha = 255) {
-  push();
-  translate(x, y);
-  scale(scaleVal);
-  fill(255, 255, 255, alpha); // ✅
-  noStroke();
-  beginShape();
-  vertex(225, 130.5);
-  bezierVertex(225, 130.5, 34, 130.5, 34, 130.5);
-  bezierVertex(21, 129.5, -3.8, 119.8, 1, 89);
-  bezierVertex(5.8, 58.2, 35, 54.833, 49, 57);
-  bezierVertex(47.5, 49.167, 50.5, 32.5, 74.5, 28.5);
-  bezierVertex(98.5, 24.5, 108.833, 37.167, 111, 44);
-  bezierVertex(112.167, 31.167, 121.6, 4.6, 150, 1);
-  bezierVertex(191.6, -3.8, 208.333, 23.334, 211.5, 37.5);
-  bezierVertex(218, 31.5, 269.5, 41, 268, 83.5);
-  bezierVertex(266.8, 117.5, 238.833, 129, 225, 130.5);
-  endShape(CLOSE);
-  pop();
-}
 
 let rainbowBuffer = null;
 
@@ -1264,31 +1295,59 @@ function updateAndDrawFireworks() {
 }
 
 
-let birds = [];
+let fishes = [];
 
-function triggerBirdFlock() {
-  for (let i = 0; i < 20; i++) {
-    birds.push({
-      x: random(width),
-      y: random(height * 0.1, height * 0.4),
-      vx: random(2, 5),
-      vy: random(-1, 1),
-      size: random(8, 15),
+function triggerFishSchool() {
+  fishes = [];
+  let startX = -100;
+  let horizonY = height * horizonRatio;
+  let startY = random(horizonY + 50, height * 0.9); // 바다 쪽에서 시작
+  let directionAngle = random(-PI / 16, PI / 16);
+  let fishCount = int(random(6, 10)); // 물고기 수 조금 줄임
+
+  // 바다쪽 색 기준으로 (shallowColor)
+  let baseOceanColor = shallowColor;
+
+  for (let i = 0; i < fishCount; i++) {
+    let distance = i * 40;
+    let offsetY = abs(i - fishCount / 2) * 20;
+
+    fishes.push({
+      x: startX - distance,
+      y: startY + offsetY,
+      vx: cos(directionAngle) * random(3, 5),
+      vy: sin(directionAngle) * random(1, 2),
+      size: random(10, 16),
+      swimPhase: random(TWO_PI),
+      baseColor: lerpColor(
+        baseOceanColor,
+        color(230, 230, 255), // 옅은 하늘+은은한 회색 느낌
+        random(0.3, 0.7)
+      ),
       life: 0
     });
   }
 }
 
-function updateAndDrawBirds() {
+function updateAndDrawFish() {
   noStroke();
-  fill(30);
-  for (let b of birds) {
-    ellipse(b.x, b.y, b.size, b.size * 0.6);
-    b.x += b.vx;
-    b.y += b.vy + sin(frameCount * 0.1 + b.x * 0.05) * 1.5;
-    b.life++;
+
+  for (let f of fishes) {
+    let swimWiggle = sin(frameCount * 0.4 + f.swimPhase) * 5;
+
+    push();
+    translate(f.x, f.y);
+    rotate(atan2(f.vy, f.vx) + radians(swimWiggle));
+    fill(f.baseColor);
+    ellipse(0, 0, f.size * 2.0, f.size * 0.8); // 더 물고기 느낌으로 (길고 둥글게)
+    pop();
+
+    f.x += f.vx;
+    f.y += f.vy + sin(frameCount * 0.08 + f.x * 0.02) * 0.5;
+    f.life++;
   }
-  birds = birds.filter(b => b.x < width + 50 && b.life < 200);
+
+  fishes = fishes.filter(f => f.x < width + 200 && f.life < 400);
 }
 
 function keyPressed() {
@@ -1300,21 +1359,9 @@ function keyPressed() {
     let k = key.toLowerCase();
     if (k === 'f') {
       triggerFireworks();
-    } else if (k === 's') {
-      triggerSparklingWater();
-    } else if (k === 'b') {
-      triggerBirdFlock();
-    } else if (k === 'r') {
-      triggerRainbow();
-    } else if (k === 'j') {
-      triggerJellyfish();
+    } else if (k === 'a') {
+      triggerFishSchool();  // 변경: triggerBirdFlock() → triggerFishSchool()
     }
-  }
-}
-
-function keyReleased() {
-  if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) {
-    turnAngle = 0;
   }
 }
 
