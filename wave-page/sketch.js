@@ -25,6 +25,7 @@ let rainbowCenterX;
 let shootingStars = [];
 let hasShootingStars = false;
 let shootingStarTimer = 0;
+let rainbow;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -42,14 +43,11 @@ function setup() {
     "morning", "day", "sunset", "night", "twilight", "golden",
     "turquoise", "mediterranean", "stormy", "blush", "rainyNight",
   ];
-  timeOfDay = random(times); // 시간대 랜덤 선택
+  timeOfDay = random(times);
 
-  setTimeColors(); // 테마 색상 세팅
+  setTimeColors(); // ✨ sunPos, oceanBaseColor 등 초기화
 
-  // 별똥별 여부
-  hasShootingStars = ["night", "twilight", "stormy", "blush"].includes(timeOfDay) && random() < 0.7;
-
-  // 수평선 위치 설정
+  // 수평선 비율 설정
   if (["turquoise", "mediterranean", "golden"].includes(timeOfDay)) {
     horizonRatio = 0.45;
   } else if (["sunset", "twilight", "blush"].includes(timeOfDay)) {
@@ -58,7 +56,7 @@ function setup() {
     horizonRatio = 0.5;
   }
 
-  // 파도 색상 팔레트 생성
+  // 파도 팔레트 생성
   palette = [];
   for (let i = 0; i < 6; i++) {
     palette.push(
@@ -71,56 +69,67 @@ function setup() {
     );
   }
 
-  createClouds();  // Cloud 인스턴스로 채워진 clouds 배열
+  // 구름, 배, 별똥별 생성
+  createClouds();
   createShipTrail();
-
-  // 달 설정
-  if (["night", "twilight", "stormy", "rainyNight"].includes(timeOfDay)) {
-    moonPhase = random(["crescent", "half", "gibbous", "full", "new"]);
-    moonShapeIndex = floor(random(3));
-    moonPos = createVector(random(width * 0.3, width * 0.7), height * 0.2);
+  shootingStars = [];
+  for (let i = 0; i < int(random(3, 5)); i++) {
+    createShootingStar();
   }
 
-  // 비오는 밤
-  if (timeOfDay === "rainyNight") {
-    hasShootingStars = false;
-    clearSky = false;
-    createRain();
-  }
-
-  // 반짝이
+  // 반짝이들
   sparkles = [];
   let sparkleMinY = height * horizonRatio + 30;
   let sparkleMaxY = height * 0.92;
   for (let i = 0; i < 130; i++) {
-    sparkles.push({
-      x: random(width * 0.05, width * 0.95),
-      y: random(sparkleMinY, sparkleMaxY),
-      size: random(0.4, 1.0),
-      alpha: random(100, 180),
-      flicker: random(0.08, 0.18),
-    });
+    sparkles.push(new Sparkle(
+      random(width * 0.05, width * 0.95),
+      random(sparkleMinY, sparkleMaxY),
+      random(0.4, 1.0),
+      random(100, 180),
+      random(0.08, 0.18)
+    ));
   }
 
-  // 별
+  // 별들
   stars = [];
   if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
     let horizonY = height * horizonRatio;
     for (let i = 0; i < 150; i++) {
-      stars.push({
-        x: random(width),
-        y: random(horizonY * 0.2, horizonY - 30),
-        size: random(1, 3),
-        alpha: random(100, 255),
-        blinkSpeed: random(0.5, 2),
-      });
+      stars.push(new Star(
+        random(width),
+        random(horizonY * 0.2, horizonY - 30),
+        random(1, 3),
+        random(100, 255),
+        random(0.5, 2)
+      ));
     }
   }
 
-  // 별똥별
-  shootingStars = [];
-  for (let i = 0; i < int(random(3, 5)); i++) {
-    createShootingStar();
+  // 밤이면 달 생성
+  if (["night", "twilight", "stormy", "rainyNight", "blush"].includes(timeOfDay)) {
+    moonPhase = random(["crescent", "half", "gibbous", "full", "new"]);
+    moonShapeIndex = floor(random(3));
+    moonPos = createVector(random(width * 0.3, width * 0.7), height * 0.2);
+    moon = new Moon(moonPos);
+  }
+
+  // 비오는 밤 세팅
+  if (timeOfDay === "rainyNight") {
+    hasShootingStars = false;
+    clearSky = false;
+    createRain();
+  } else {
+    hasShootingStars = ["night", "twilight", "stormy", "blush"].includes(timeOfDay) && random() < 0.7;
+  }
+
+  // 해와 바다 객체 생성
+  sun = new Sun(sunPos);
+  ocean = new Ocean(palette, waveParticleScale, horizonRatio);
+
+  // 무지개를 clearSky면 무조건 생성
+  if (clearSky) {
+    rainbow = new Rainbow(height * horizonRatio, rainbowCenterX, rainbowStyle);
   }
 }
 
@@ -128,16 +137,11 @@ function draw() {
   background(255);
 
   drawBackground();
+  drawSunOrMoon();
 
-  if (["night", "twilight", "stormy"].includes(timeOfDay)) {
-    drawStars();
-    drawMoon();
-  } else {
-    drawSun();
-  }
-
-  if (!["night", "twilight", "stormy"].includes(timeOfDay) && clearSky) {
-    drawRainbow();
+  if (rainbow) {
+    rainbow.update();
+    rainbow.draw();
   }
 
   if (timeOfDay === "rainyNight") {
@@ -145,31 +149,18 @@ function draw() {
     maybeFlashLightning();
   }
 
-  updateClouds();  // ✅ clouds 배열은 Cloud 객체로 되어있음
+  updateClouds();
   drawClouds();
 
-  drawOcean();
-  drawSparkles();
+  ocean.drawWaveParticles(shipTrail);
 
-  // 배 이동
-  let horizonY = height * horizonRatio;
+  for (let sparkle of sparkles) {
+    sparkle.draw();
+  }
 
-  shipDirection.rotate(turnAngle);
-  let curveAngle = sin(frameCount * 0.01) * 0.05;
-  let dir = shipDirection.copy().rotate(curveAngle);
-  shipPos.add(dir);
-
-  if (isAutoShip) {
-    if (shipPos.y > -200) {
-      shipTrail.push({ x: shipPos.x, y: shipPos.y, life: 0 });
-      shipPos.add(shipDirection);
-    }
-    if (shipPos.y <= horizonY - 100) {
-      isAutoShip = false;
-    }
-  } else {
-    if (mouseX >= 0 && mouseY >= horizonY && mouseX <= width && mouseY <= height) {
-      shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
+  if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
+    for (let star of stars) {
+      star.draw();
     }
   }
 
@@ -178,13 +169,33 @@ function draw() {
     drawShootingStars();
   }
 
+  if (isAutoShip) {
+    let curveAngle = sin(frameCount * 0.01) * 0.05;
+    let dir = shipDirection.copy().rotate(curveAngle);
+    shipPos.add(dir);
+
+    let horizonY = height * horizonRatio;
+    if (shipPos.y > -200) {
+      shipTrail.push({ x: shipPos.x, y: shipPos.y, life: 0 });
+      shipPos.add(shipDirection);
+    }
+    if (shipPos.y <= horizonY - 100) {
+      isAutoShip = false;
+    }
+  } else {
+    if (mouseX >= 0 && mouseX <= width && mouseY >= height * horizonRatio && mouseY <= height) {
+      shipTrail.push({ x: mouseX, y: mouseY, life: 0 });
+    }
+  }
+
   drawShipTrail();
   drawBubbles();
   updateAndDrawFireworks();
   updateAndDrawFish();
 
-  lightningBolts = lightningBolts.slice(-3); // 번개 개수 관리
+  lightningBolts = lightningBolts.slice(-3);
 }
+
 
 function drawSparkles() {
   noStroke();
@@ -495,7 +506,6 @@ function createClouds() {
   ];
   if (allowClearSkyTimes.includes(timeOfDay) && random() < 0.25) {
     clearSky = true;
-    return;
   }
 
   while (clouds.length < cloudCount && tries < 200) {
@@ -562,6 +572,10 @@ class Sparkle {
     this.flicker = flicker;
   }
 
+  update() {
+    // update 동작은 따로 필요 없으면 draw에서 바로 처리
+  }
+
   draw() {
     let flickerValue = sin(frameCount * this.flicker + this.x * 0.1) * 100;
     let a = constrain(this.alpha + flickerValue, 0, 255);
@@ -594,6 +608,10 @@ class Star {
     this.blinkSpeed = blinkSpeed;
   }
 
+  update() {
+    // update 동작은 따로 필요 없으면 draw에서 바로 처리
+  }
+
   draw() {
     let flicker = sin(frameCount * 0.05 * this.blinkSpeed) * 50;
     let a = constrain(this.alpha + flicker, 120, 255);
@@ -605,104 +623,192 @@ class Star {
   }
 }
 
+function drawSparkles() {
+  for (let sparkle of sparkles) {
+    sparkle.draw();
+  }
+}
+
+function drawStars() {
+  for (let star of stars) {
+    star.draw();
+  }
+}
+
+class Sun {
+  constructor(pos) {
+    this.pos = pos.copy();
+  }
+
+  draw() {
+    push();
+    translate(this.pos.x, this.pos.y);
+    let scaleFactor = map(width, 500, 1500, 0.4, 0.9) * 1.3;
+    scale(scaleFactor);
+    noStroke();
+
+    for (let i = 10; i >= 1; i--) {
+      let alpha = map(i, 10, 1, 10, 100);
+      let radius = 80 + i * 15;
+      fill(255, 255, 200, alpha);
+      ellipse(0, 0, radius);
+    }
+
+    fill(255, 240, 150, 255);
+    ellipse(0, 0, 100);
+
+    let detail = 3;
+    for (let x = -50; x < 50; x += detail) {
+      for (let y = -50; y < 50; y += detail) {
+        if (dist(0, 0, x, y) < 50) {
+          let n = noise((x + frameCount * 0.8) * 0.05, (y + frameCount * 0.8) * 0.05);
+          let r = map(n, 0, 1, 220, 255);
+          let g = map(n, 0, 1, 150, 200);
+          let b = map(n, 0, 1, 80, 120);
+          fill(r, g, b, 12);
+          ellipse(x, y, detail * 1.5);
+        }
+      }
+    }
+
+    pop();
+  }
+}
+
+class Moon {
+  constructor(pos) {
+    this.pos = pos.copy();
+  }
+
+  draw() {
+    push();
+    translate(this.pos.x, this.pos.y);
+    let scaleFactor = map(width, 500, 1500, 0.4, 0.9);
+    scale(0.28 * scaleFactor);
+    noStroke();
+
+    drawingContext.save();
+    drawingContext.filter = "blur(80px)";
+    fill(200, 220, 255, 160);
+    ellipse(0, 0, 500, 500);
+    drawingContext.restore();
+
+    fill(245, 245, 255, 240);
+    ellipse(0, 0, 500, 500);
+
+    let detail = 4;
+    for (let x = -250; x < 250; x += detail) {
+      for (let y = -250; y < 250; y += detail) {
+        if (dist(0, 0, x, y) < 250) {
+          let n = noise((x + frameCount * 0.1) * 0.01, (y + frameCount * 0.1) * 0.01);
+          let bright = map(n, 0, 1, 220, 255);
+          fill(bright, bright, 255, 8);
+          ellipse(x, y, detail * 1.2);
+        }
+      }
+    }
+
+    pop();
+  }
+}
+
+class Ocean {
+  constructor(palette, waveParticleScale, horizonRatio) {
+    this.palette = palette;
+    this.waveParticleScale = waveParticleScale;
+    this.horizonRatio = horizonRatio;
+  }
+
+  drawWaveParticles(shipTrail) {
+    noStroke();
+    let baseSpacing = 13;
+    let spacing = baseSpacing * this.waveParticleScale;
+    let horizonY = height * this.horizonRatio;
+    let recentTrail = shipTrail.slice(-30);
+    let time = frameCount * 0.015;
+
+    for (let y = horizonY; y < height; y += spacing) {
+      for (let x = 0; x < width; x += spacing) {
+        let wave = 0;
+        if (recentTrail.length > 0) {
+          for (let p of recentTrail) {
+            let d = dist(x, y, p.x, p.y);
+            wave += sin(d * 0.04 - time);
+          }
+          wave /= recentTrail.length;
+        } else {
+          let phase = (x + y) * 0.02;
+          wave = sin(phase + time) * 0.6 + cos(phase * 0.5 + time * 1.3) * 0.4;
+          wave *= 0.5;
+        }
+
+        let baseSize = map(wave, -1, 1, 6, 14);
+        let size = baseSize * this.waveParticleScale;
+        let col = this.palette[(floor(x / spacing) + floor(y / spacing)) % this.palette.length];
+        let yOffset = sin(x * 0.02 + time * 2) * 4 + cos(y * 0.01 + time * 1.5) * 2;
+
+        fill(col);
+        ellipse(x, y + yOffset, size);
+      }
+    }
+  }
+}
+
+class BubbleManager {
+  constructor(oceanBaseColor) {
+    this.bubbles = [];
+    this.oceanBaseColor = oceanBaseColor;
+  }
+
+  add(bubble) {
+    this.bubbles.push(bubble);
+  }
+
+  updateAndDraw() {
+    noStroke();
+    for (let i = this.bubbles.length - 1; i >= 0; i--) {
+      let b = this.bubbles[i];
+      b.y += sin(frameCount * 0.12 + b.x * 0.05) * 1.2;
+      b.x += cos(frameCount * 0.1 + b.y * 0.05) * 1.0;
+
+      let angleOffset = sin(frameCount * 0.05 + b.x * 0.02) * PI;
+      let pulse = sin(frameCount * 0.25 + b.x * 0.5 + b.y * 0.4) * 0.5 + 1.1;
+      let w = b.r * pulse * random(1.4, 2.8);
+      let h = b.r * pulse * random(0.7, 1.3);
+
+      push();
+      translate(b.x, b.y);
+      rotate(angleOffset);
+      fill(255, 255, 255, b.alpha * 0.2);
+      ellipse(0, 0, w, h);
+      pop();
+
+      fill(255, 255, 255, b.alpha * 0.06);
+      ellipse(b.x, b.y, b.r * pulse * random(6, 10));
+
+      b.r += 0.5;
+      b.alpha -= 2;
+      if (b.alpha <= 0) {
+        this.bubbles.splice(i, 1);
+      }
+    }
+  }
+}
 function drawSunOrMoon() {
-  let isNightTime = ["night", "twilight", "stormy", "blush"].includes(
-    timeOfDay
-  );
-
-  if (isNightTime) {
-    drawMoon();
+  if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
+    if (moon) {
+      moon.draw(); // moon이 있을 때만 그리기
+    }
   } else {
-    drawSun();
-  }
-}
-function drawSun() {
-  push();
-  translate(sunPos.x, sunPos.y);
-
-  let scaleFactor = map(width, 500, 1500, 0.4, 0.9) * 1.3;
-  scale(scaleFactor);
-
-  noStroke();
-
-  // 🔆 태양 오라
-  for (let i = 10; i >= 1; i--) {
-    let alpha = map(i, 10, 1, 10, 100);
-    let radius = 80 + i * 15;
-    fill(255, 255, 200, alpha);
-    ellipse(0, 0, radius);
-  }
-
-  // 태양 본체
-  fill(255, 240, 150, 255);
-  ellipse(0, 0, 100);
-
-  // 🔥 표면 노이즈
-  let detail = 3;
-  for (let x = -50; x < 50; x += detail) {
-    for (let y = -50; y < 50; y += detail) {
-      let d = dist(0, 0, x, y);
-      if (d < 50) {
-        let n = noise(
-          (x + frameCount * 0.8) * 0.05,
-          (y + frameCount * 0.8) * 0.05
-        );
-        let r = map(n, 0, 1, 220, 255);
-        let g = map(n, 0, 1, 150, 200);
-        let b = map(n, 0, 1, 80, 120);
-        fill(r, g, b, 12);
-        ellipse(x, y, detail * 1.5);
-      }
+    if (sun) {
+      sun.draw();
     }
   }
-
-  pop();
-}
-
-function drawMoon() {
-  push();
-  translate(moonPos.x, moonPos.y);
-
-  let scaleFactor = map(width, 500, 1500, 0.4, 0.9);
-  scale(0.28 * scaleFactor);
-
-  noStroke();
-
-  // 블러 달빛 효과
-  drawingContext.save();
-  drawingContext.filter = "blur(80px)";
-  fill(200, 220, 255, 160);
-  ellipse(0, 0, 500, 500);
-  drawingContext.restore();
-
-  // 달 본체
-  fill(245, 245, 255, 240);
-  ellipse(0, 0, 500, 500);
-
-  // 노이즈 텍스처
-  let detail = 4; // 픽셀 간격 (낮을수록 디테일 ↑)
-  for (let x = -250; x < 250; x += detail) {
-    for (let y = -250; y < 250; y += detail) {
-      let d = dist(0, 0, x, y);
-      if (d < 250) {
-        let n = noise(
-          (x + frameCount * 0.1) * 0.01,
-          (y + frameCount * 0.1) * 0.01
-        );
-        let bright = map(n, 0, 1, 220, 255);
-        fill(bright, bright, 255, 8); // 옅은 점으로 텍스처 느낌
-        ellipse(x, y, detail * 1.2);
-      }
-    }
-  }
-
-  pop();
 }
 
 function drawOcean() {
   drawWaveParticles();
 }
-
 function drawWaveParticles() {
   noStroke();
 
@@ -903,26 +1009,24 @@ function createShipTrail() {
   shipDirection = p5.Vector.fromAngle(angle).normalize().mult(shipSpeed);
 }
 
-
 let rainbowBuffer = null;
 
-function drawRainbow() {
-  if (
-    clouds.length > 0 ||
-    ["night", "twilight", "stormy", "sunset"].includes(timeOfDay)
-  ) return;
+class Rainbow {
+  constructor(horizonY, centerX, style) {
+    this.horizonY = horizonY;
+    this.centerX = centerX;
+    this.style = style;
+    this.buffer = createGraphics(width, height);
+    this.generateRainbow();
+  }
 
-  let horizonY = height * horizonRatio;
-
-  if (!rainbowBuffer) {
-    rainbowBuffer = createGraphics(width, height);
-    rainbowBuffer.noStroke();
-
-    let gradient = rainbowBuffer.drawingContext.createLinearGradient(
+  generateRainbow() {
+    this.buffer.noStroke();
+    let gradient = this.buffer.drawingContext.createLinearGradient(
       width / 2,
       0,
       width / 2,
-      horizonY
+      this.horizonY
     );
 
     gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.25)");
@@ -933,121 +1037,131 @@ function drawRainbow() {
     gradient.addColorStop(0.85, "rgba(10, 0, 190, 0.25)");
     gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.25)");
 
-    rainbowBuffer.drawingContext.fillStyle = gradient;
+    this.buffer.drawingContext.fillStyle = gradient;
 
-    if (rainbowStyle === 1) {
-      drawRainbowStyle1(rainbowBuffer, horizonY, rainbowCenterX);
-    } else if (rainbowStyle === 2) {
-      drawRainbowStyle2(rainbowBuffer, horizonY, rainbowCenterX);
+    if (this.style === 1) {
+      this.drawStyle1();
+    } else if (this.style === 2) {
+      this.drawStyle2();
     } else {
-      drawRainbowStyle3(rainbowBuffer, horizonY, rainbowCenterX);
+      this.drawStyle3();
     }
   }
 
-  push();
-  drawingContext.save();
-  drawingContext.filter = "blur(90px)"; //  메인캔버스에 블러 적용
-  image(rainbowBuffer, 0, 0);
-  drawingContext.restore();
-  pop();
-}
+  draw() {
+    push();
+    drawingContext.save();
+    drawingContext.filter = "blur(90px)";
+    image(this.buffer, 0, 0);
+    drawingContext.restore();
+    pop();
+  }
 
-function drawRainbowStyle1(pg, horizonY, centerX) {
-  pg.beginShape();
-  pg.vertex(centerX - width * 0.4, 0); // 시작점 더 바깥
-  pg.vertex(centerX - width * 0.7, 0); // 훨씬 바깥
+  drawStyle1() {
+    let pg = this.buffer;
+    pg.beginShape();
+    pg.vertex(this.centerX - width * 0.4, 0);
+    pg.vertex(this.centerX - width * 0.7, 0);
 
-  pg.bezierVertex(
-    centerX - width * 0.8,
-    horizonY * 0.2, // 더 과장된 컨트롤 포인트
-    centerX - width * 0.1,
-    horizonY * 0.5,
-    centerX + width * 0.1,
-    horizonY * 0.7
-  );
+    pg.bezierVertex(
+      this.centerX - width * 0.8,
+      this.horizonY * 0.2,
+      this.centerX - width * 0.1,
+      this.horizonY * 0.5,
+      this.centerX + width * 0.1,
+      this.horizonY * 0.7
+    );
 
-  pg.bezierVertex(
-    centerX + width * 0.6,
-    horizonY * 1.0,
-    centerX + width * 0.8,
-    horizonY * 0.8,
-    centerX + width * 0.6,
-    horizonY
-  );
+    pg.bezierVertex(
+      this.centerX + width * 0.6,
+      this.horizonY,
+      this.centerX + width * 0.8,
+      this.horizonY * 0.8,
+      this.centerX + width * 0.6,
+      this.horizonY
+    );
 
-  pg.vertex(centerX + width * 0.6, horizonY);
+    pg.vertex(this.centerX + width * 0.6, this.horizonY);
 
-  pg.bezierVertex(
-    centerX + width * 0.4,
-    horizonY * 0.7,
-    centerX - width * 0.2,
-    horizonY * 0.3,
-    centerX - width * 0.4,
-    0
-  );
-  pg.endShape(CLOSE);
-}
+    pg.bezierVertex(
+      this.centerX + width * 0.4,
+      this.horizonY * 0.7,
+      this.centerX - width * 0.2,
+      this.horizonY * 0.3,
+      this.centerX - width * 0.4,
+      0
+    );
+    pg.endShape(CLOSE);
+  }
 
-function drawRainbowStyle2(pg, horizonY, centerX) {
-  pg.beginShape();
-  pg.vertex(centerX + width * 0.4, 0);
-  pg.vertex(centerX + width * 0.7, 0);
+  drawStyle2() {
+    let pg = this.buffer;
+    pg.beginShape();
+    pg.vertex(this.centerX + width * 0.4, 0);
+    pg.vertex(this.centerX + width * 0.7, 0);
 
-  pg.bezierVertex(
-    centerX + width * 0.8,
-    horizonY * 0.25,
-    centerX + width * 0.1,
-    horizonY * 0.55,
-    centerX - width * 0.1,
-    horizonY * 0.75
-  );
+    pg.bezierVertex(
+      this.centerX + width * 0.8,
+      this.horizonY * 0.25,
+      this.centerX + width * 0.1,
+      this.horizonY * 0.55,
+      this.centerX - width * 0.1,
+      this.horizonY * 0.75
+    );
 
-  pg.bezierVertex(
-    centerX - width * 0.7,
-    horizonY * 1.05,
-    centerX - width * 0.9,
-    horizonY * 0.85,
-    centerX - width * 0.6,
-    horizonY
-  );
+    pg.bezierVertex(
+      this.centerX - width * 0.7,
+      this.horizonY * 1.05,
+      this.centerX - width * 0.9,
+      this.horizonY * 0.85,
+      this.centerX - width * 0.6,
+      this.horizonY
+    );
 
-  pg.vertex(centerX - width * 0.6, horizonY);
+    pg.vertex(this.centerX - width * 0.6, this.horizonY);
 
-  pg.bezierVertex(
-    centerX - width * 0.4,
-    horizonY * 0.7,
-    centerX + width * 0.2,
-    horizonY * 0.3,
-    centerX + width * 0.4,
-    0
-  );
-  pg.endShape(CLOSE);
-}
-function drawRainbowStyle3(pg, horizonY, centerX) {
-  pg.beginShape();
-  pg.vertex(centerX - width * 0.3, 0);
-  pg.vertex(centerX - width * 0.65, 0);
+    pg.bezierVertex(
+      this.centerX - width * 0.4,
+      this.horizonY * 0.7,
+      this.centerX + width * 0.2,
+      this.horizonY * 0.3,
+      this.centerX + width * 0.4,
+      0
+    );
+    pg.endShape(CLOSE);
+  }
 
-  pg.bezierVertex(
-    centerX - width * 0.75,
-    horizonY * 0.2,
-    centerX + width * 0.75,
-    horizonY * 0.8,
-    centerX + width * 0.65,
-    horizonY
-  );
+  drawStyle3() {
+    let pg = this.buffer;
+    pg.beginShape();
+    pg.vertex(this.centerX - width * 0.3, 0);
+    pg.vertex(this.centerX - width * 0.65, 0);
 
-  pg.vertex(centerX + width * 0.65, horizonY);
+    pg.bezierVertex(
+      this.centerX - width * 0.75,
+      this.horizonY * 0.2,
+      this.centerX + width * 0.75,
+      this.horizonY * 0.8,
+      this.centerX + width * 0.65,
+      this.horizonY
+    );
 
-  pg.bezierVertex(
-    centerX + width * 0.4,
-    horizonY * 0.6,
-    centerX - width * 0.4,
-    horizonY * 0.2,
-    centerX - width * 0.3,
-    0
-  );
-  pg.endShape(CLOSE);
+    pg.vertex(this.centerX + width * 0.65, this.horizonY);
+
+    pg.bezierVertex(
+      this.centerX + width * 0.4,
+      this.horizonY * 0.6,
+      this.centerX - width * 0.4,
+      this.horizonY * 0.2,
+      this.centerX - width * 0.3,
+      0
+    );
+    pg.endShape(CLOSE);
+  }
+  update() {
+    this.centerX += sin(frameCount * 0.01) * 0.2; // 좌우로 살짝 흔들리기
+  }
+  
 }
 
 function updateShootingStars() {
