@@ -42,18 +42,18 @@ function setup() {
     "morning", "day", "sunset", "night", "twilight", "golden",
     "turquoise", "mediterranean", "stormy", "blush", "rainyNight",
   ];
-  timeOfDay = random(times); // ⭐ 시간대 랜덤 선택
+  timeOfDay = random(times); // 시간대 랜덤 선택
 
   setTimeColors(); // ⭐ 테마 색상 세팅
 
-  // ⭐ 별똥별 여부
+  // 별똥별 여부
   if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
     hasShootingStars = random() < 0.7;
   } else {
     hasShootingStars = false;
   }
 
-  // ⭐ 수평선 위치 설정
+  // 수평선 위치 설정
   if (["turquoise", "mediterranean", "golden"].includes(timeOfDay)) {
     horizonRatio = 0.45;
   } else if (["sunset", "twilight", "blush"].includes(timeOfDay)) {
@@ -62,7 +62,7 @@ function setup() {
     horizonRatio = 0.5;
   }
 
-  // ⭐ 파도 색상 팔레트 생성
+  // 파도 색상 팔레트 생성
   for (let i = 0; i < 6; i++) {
     palette.push(
       color(
@@ -77,35 +77,36 @@ function setup() {
   createClouds();
   createShipTrail();
 
-  // ⭐ 달 조건: 비오는 밤 포함
+  // 달 조건: 비오는 밤 포함
   if (["night", "twilight", "stormy", "rainyNight"].includes(timeOfDay)) {
     moonPhase = random(["crescent", "half", "gibbous", "full", "new"]);
     moonShapeIndex = floor(random(3));
     moonPos = createVector(random(width * 0.3, width * 0.7), height * 0.2);
   }
 
-  // ⭐ 비오는 밤 전용 효과
+  // 비오는 밤 전용 효과
   if (timeOfDay === "rainyNight") {
     hasShootingStars = false;
     clearSky = false;
     createRain(); // ← 따로 정의해둬야 함
   }
 
-  // ⭐ 반짝이들
+  // 반짝이들
   let sparkleMinY = height * horizonRatio + 30;
   let sparkleMaxY = height * 0.92;
 
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 130; i++) { // ⭐ 개수 130개 정도로 늘리기
     sparkles.push({
-      x: random(width * 0.1, width * 0.9),
+      x: random(width * 0.05, width * 0.95),
       y: random(sparkleMinY, sparkleMaxY),
-      size: random(0.8, 1.5),
+      size: random(0.4, 1.0), // ⭐ 훨씬 작게
       alpha: random(100, 180),
       flicker: random(0.08, 0.18),
     });
   }
+  
 
-  // ⭐ 별 추가 (밤 계열에만)
+  // 별 추가 (밤 계열에만)
   const starTimes = ["night", "twilight", "stormy", "blush"];
   if (starTimes.includes(timeOfDay)) {
     let horizonY = height * horizonRatio;
@@ -120,7 +121,7 @@ function setup() {
     }
   }
 
-  // ⭐ 별똥별 초기 생성
+  // 별똥별 초기 생성
   for (let i = 0; i < int(random(3, 5)); i++) {
     createShootingStar();
   }
@@ -194,25 +195,26 @@ function drawSparkles() {
   noStroke();
 
   for (let s of sparkles) {
-    let flicker = sin(frameCount * s.flicker + s.x * 0.1) * 100; // 강한 반짝임
+    let flicker = sin(frameCount * s.flicker + s.x * 0.1) * 100;
     let alpha = constrain(s.alpha + flicker, 0, 255);
 
-    // 외곽 퍼짐 효과
+    let offsetX = sin(frameCount * 0.01 + s.y * 0.05) * 3;
+    let offsetY = cos(frameCount * 0.01 + s.x * 0.05) * 1.5;
+
+    let sizePulse = sin(frameCount * 0.02 + s.x * 0.5) * 0.2 + 1;
+
     fill(255, 255, 255, alpha * 0.12);
-    ellipse(s.x, s.y, s.size * 80, s.size * 30);
+    ellipse(s.x + offsetX, s.y + offsetY, s.size * 80 * sizePulse, s.size * 30 * sizePulse);
 
-    // 중앙 glow
     fill(255, 255, 255, alpha * 0.5);
-    ellipse(s.x, s.y, s.size * 14);
+    ellipse(s.x + offsetX, s.y + offsetY, s.size * 14 * sizePulse);
 
-    // 컬러톤 추가 (보랏빛 느낌도 넣을 수 있음)
     fill(255, 240, 180, alpha * 0.3);
-    ellipse(s.x, s.y, s.size * 35);
+    ellipse(s.x + offsetX, s.y + offsetY, s.size * 35 * sizePulse);
 
-    // ✨ 추가 강화 반짝임 포인트 (작은 스파클 효과)
     if (random() < 0.08) {
       fill(255, 255, 255, alpha);
-      ellipse(s.x + random(-2, 2), s.y + random(-2, 2), s.size * 3);
+      ellipse(s.x + offsetX + random(-2, 2), s.y + offsetY + random(-2, 2), s.size * 3);
     }
   }
 }
@@ -395,16 +397,16 @@ function drawBackground() {
     line(0, y, width, y);
   }
 }
-
-
 function drawStars() {
   noStroke();
-  for (let i = 0; i < stars.length; i++) {
-    let star = stars[i];
+  for (let star of stars) {
     let flicker = sin(frameCount * 0.05 * star.blinkSpeed) * 50;
     let alpha = constrain(star.alpha + flicker, 120, 255);
+
+    let starX = (star.x + frameCount * 0.01) % width;
+
     fill(255, 255, 255, alpha);
-    ellipse(star.x, star.y, star.size);
+    ellipse(starX, star.y, star.size);
   }
 }
 
@@ -472,12 +474,15 @@ function drawClouds() {
 }
 function updateClouds() {
   for (let c of clouds) {
-    c.x += c.vx; // 구름 이동만 한다. 순간이동 없이!
+    c.x += c.vx;
 
-    // 순간이동 금지! 그냥 x 값만 계속 증가하거나 감소하게 둔다!
+    if (c.x < -width * 0.5) { 
+      c.x = width + width * 0.5; // 왼쪽으로 너무 나가면 오른쪽 끝으로 이동
+    } else if (c.x > width + width * 0.5) {
+      c.x = -width * 0.5; // 오른쪽으로 너무 나가면 왼쪽 끝으로 이동
+    }
   }
 }
-
 
 function drawSingleCloud(c) {
   switch (c.style) {
