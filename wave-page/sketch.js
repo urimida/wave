@@ -26,16 +26,18 @@ let shootingStars = [];
 let hasShootingStars = false;
 let shootingStarTimer = 0;
 let rainbow;
-
+let sparkleStyle; 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   noStroke();
+  
+  sparkleStyle = int(random(1, 4)); // 1~3 랜덤 선택
 
   cloudDirection = random() < 0.5 ? "left" : "right";
   rainbowStyle = floor(random(1, 4));
   rainbowCenterX = random(width * 0.4, width * 0.6);
 
-  shipSpeed = random(0.5, 1);
+  shipSpeed = random(1, 2);
   let sizeMode = random(["medium", "large"]);
   waveParticleScale = sizeMode === "large" ? 2.3 : 1.8;
 
@@ -131,6 +133,10 @@ function setup() {
   if (clearSky) {
     rainbow = new Rainbow(height * horizonRatio, rainbowCenterX, rainbowStyle);
   }
+  if (["blush", "twilight"].includes(timeOfDay) && random() < 0.2) {
+    triggerFireworks();
+  }
+  
 }
 
 function draw() {
@@ -170,6 +176,7 @@ function draw() {
   }
 
   if (isAutoShip) {
+    shipDirection.rotate(turnAngle);
     let curveAngle = sin(frameCount * 0.01) * 0.05;
     let dir = shipDirection.copy().rotate(curveAngle);
     shipPos.add(dir);
@@ -572,10 +579,6 @@ class Sparkle {
     this.flicker = flicker;
   }
 
-  update() {
-    // update 동작은 따로 필요 없으면 draw에서 바로 처리
-  }
-
   draw() {
     let flickerValue = sin(frameCount * this.flicker + this.x * 0.1) * 100;
     let a = constrain(this.alpha + flickerValue, 0, 255);
@@ -583,20 +586,67 @@ class Sparkle {
     let offsetY = cos(frameCount * 0.01 + this.x * 0.05) * 1.5;
     let sizePulse = sin(frameCount * 0.02 + this.x * 0.5) * 0.2 + 1;
 
-    noStroke();
-    fill(255, 255, 255, a * 0.12);
-    ellipse(this.x + offsetX, this.y + offsetY, this.size * 80 * sizePulse, this.size * 30 * sizePulse);
+    push();
+    translate(this.x + offsetX, this.y + offsetY);
 
-    fill(255, 255, 255, a * 0.5);
-    ellipse(this.x + offsetX, this.y + offsetY, this.size * 14 * sizePulse);
-
-    fill(255, 240, 180, a * 0.3);
-    ellipse(this.x + offsetX, this.y + offsetY, this.size * 35 * sizePulse);
-
-    if (random() < 0.08) {
-      fill(255, 255, 255, a);
-      ellipse(this.x + offsetX + random(-2, 2), this.y + offsetY + random(-2, 2), this.size * 3);
+    if (sparkleStyle === 1) {
+      // 부드러운 타원형 (기존)
+      fill(255, 255, 255, a * 0.12);
+      ellipse(0, 0, this.size * 80 * sizePulse, this.size * 30 * sizePulse);
+      fill(255, 255, 255, a * 0.5);
+      ellipse(0, 0, this.size * 14 * sizePulse);
+      fill(255, 240, 180, a * 0.3);
+      ellipse(0, 0, this.size * 35 * sizePulse);
+    } 
+    
+    else if (sparkleStyle === 2) {
+      // 120프레임 주기로 (60프레임 fade in + 60프레임 fade out)
+      let phase = frameCount % 120;
+      let phaseAlpha = 1.0;
+    
+      if (phase < 60) {
+        // 첫 60프레임은 점점 밝아짐
+        phaseAlpha = map(phase, 0, 60, 0, 1);
+      } else {
+        // 다음 60프레임은 점점 어두워짐
+        phaseAlpha = map(phase, 60, 120, 1, 0);
+      }
+    
+      for (let i = 0; i < 8; i++) {
+        let angle = i * (TWO_PI / 6) + frameCount * 0.01;
+        let r = this.size * 4;
+        let x = cos(angle) * r * 0.6;
+        let y = sin(angle) * r * 0.6;
+    
+        fill(255, 255, 220, a * phaseAlpha); // alpha에 phaseAlpha를 곱해줌
+        ellipse(x, y, 3, 3);
+      }
     }
+    
+    
+    else if (sparkleStyle === 3) {
+      let baseTime = (frameCount * 0.3) % (width * 2); 
+      // 속도 0.5 → 0.3으로 느리게
+      
+      let growFactor = map(frameCount % 80, 0, 80, 1, 80);
+      // 1배 → 80배 좌우 커짐, 주기 80프레임
+      
+      for (let i = 0; i < 14; i++) { 
+        let angle = random(-PI / 8, PI / 8); 
+        let r = this.size * random(30, 60);  // 살짝 더 부드럽게
+        
+        let dx = (baseTime + cos(angle) * r * growFactor) % width; 
+        let dy = sin(angle) * r * 0.8; 
+        
+        fill(255, 230, 180, a * 0.25); // 약간 더 선명하게
+        ellipse(dx, dy, r * 0.5, r * 0.3);
+      }
+    }
+    
+    
+    
+
+    pop();
   }
 }
 class Star {
@@ -795,7 +845,7 @@ class BubbleManager {
   }
 }
 function drawSunOrMoon() {
-  if (["night", "twilight", "stormy", "blush"].includes(timeOfDay)) {
+  if (["night", "twilight", "stormy", "blush","rainyNight"].includes(timeOfDay)) {
     if (moon) {
       moon.draw(); // moon이 있을 때만 그리기
     }
@@ -1029,13 +1079,14 @@ class Rainbow {
       this.horizonY
     );
 
-    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.25)");
-    gradient.addColorStop(0.25, "rgba(255, 179, 0, 0.25)");
-    gradient.addColorStop(0.4, "rgba(255, 247, 0, 0.25)");
-    gradient.addColorStop(0.55, "rgba(0, 255, 128, 0.25)");
-    gradient.addColorStop(0.7, "rgba(45, 174, 255, 0.25)");
-    gradient.addColorStop(0.85, "rgba(10, 0, 190, 0.25)");
-    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.25)");
+    gradient.addColorStop(0.0, "rgba(255, 0, 0, 0.3)");
+    gradient.addColorStop(0.25, "rgba(255, 179, 0, 0.3)");
+    gradient.addColorStop(0.4, "rgba(255, 247, 0, 0.3)");
+    gradient.addColorStop(0.55, "rgba(0, 255, 128, 0.3)");
+    gradient.addColorStop(0.7, "rgba(45, 174, 255, 0.3)");
+    gradient.addColorStop(0.85, "rgba(10, 0, 190, 0.3)");
+    gradient.addColorStop(1.0, "rgba(179, 0, 196, 0.3)");
+    
 
     this.buffer.drawingContext.fillStyle = gradient;
 
