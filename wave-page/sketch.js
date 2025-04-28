@@ -126,7 +126,6 @@ function setup() {
   }
 }
 
-
 function draw() {
   background(255);
   drawBackground();
@@ -454,38 +453,31 @@ function createClouds() {
   }
 }
 
-
 function drawClouds() {
   push();
   drawingContext.save();
-  drawingContext.filter = "blur(23px)"; // 구름 전체 블러
+  drawingContext.filter = "blur(23px)"; // 블러 효과
 
   for (let c of clouds) {
-    push(); // 각각 구름마다 push
-    drawSingleCloud(c);
-    pop();
-
-    push();
-    translate(-width, 0);
-    drawSingleCloud(c);
-    pop();
-
-    push();
-    translate(width, 0);
-    drawSingleCloud(c);
-    pop();
+    for (let offset = -1; offset <= 1; offset++) {
+      push();
+      translate(c.x + offset * width, c.y); // x축 복제 (-width, 0, +width)
+      drawSingleCloud({x: 0, y: 0, s: c.s, alpha: c.alpha, style: c.style});
+      pop();
+    }
   }
 
   drawingContext.restore();
   pop();
 }
-
 function updateClouds() {
-  for (let i = 0; i < clouds.length; i++) {
-    let c = clouds[i];
-    c.x += c.vx; // 이동만 해주고, 순간이동 로직 삭제
+  for (let c of clouds) {
+    c.x += c.vx; // 구름 이동만 한다. 순간이동 없이!
+
+    // 순간이동 금지! 그냥 x 값만 계속 증가하거나 감소하게 둔다!
+  }
 }
-}
+
 
 function drawSingleCloud(c) {
   switch (c.style) {
