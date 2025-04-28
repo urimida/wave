@@ -483,19 +483,8 @@ function drawClouds() {
 function updateClouds() {
   for (let i = 0; i < clouds.length; i++) {
     let c = clouds[i];
-    c.x += c.vx;
-
-    let cloudWidth = 400 * c.s; // 구름 하나의 대략적인 너비
-
-    // 오른쪽 끝으로 넘어가면 왼쪽으로
-    if (c.x - cloudWidth * 0.5 > width) {
-      c.x = -cloudWidth * 0.5;
-    }
-    // 왼쪽 끝으로 넘어가면 오른쪽으로
-    else if (c.x + cloudWidth * 0.5 < 0) {
-      c.x = width + cloudWidth * 0.5;
-    }
-  }
+    c.x += c.vx; // 이동만 해주고, 순간이동 로직 삭제
+}
 }
 
 function drawSingleCloud(c) {
