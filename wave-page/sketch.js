@@ -625,25 +625,24 @@ class Sparkle {
     
     
     else if (sparkleStyle === 3) {
-      let baseTime = (frameCount * 0.3) % (width * 2); 
-      // 속도 0.5 → 0.3으로 느리게
-      
-      let growFactor = map(frameCount % 80, 0, 80, 1, 80);
-      // 1배 → 80배 좌우 커짐, 주기 80프레임
-      
+      let baseTime = (frameCount * 0.1) % (width * 2); 
+      // 속도 더 느리게 (0.3 → 0.15)
+    
+      let growFactor = map(frameCount % 100, 0, 100, 1, 80);
+      // 퍼지는 시간도 좀 느리게 (80프레임 → 100프레임)
+    
       for (let i = 0; i < 14; i++) { 
         let angle = random(-PI / 8, PI / 8); 
-        let r = this.size * random(30, 60);  // 살짝 더 부드럽게
-        
+        let r = this.size * random(15, 30);  
+        // 덩어리 크기 절반으로 줄임 (30~60 → 15~30)
+    
         let dx = (baseTime + cos(angle) * r * growFactor) % width; 
         let dy = sin(angle) * r * 0.8; 
-        
-        fill(255, 230, 180, a * 0.25); // 약간 더 선명하게
+    
+        fill(255, 230, 180, a * 0.25);
         ellipse(dx, dy, r * 0.5, r * 0.3);
       }
     }
-    
-    
     
 
     pop();
