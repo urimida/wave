@@ -485,16 +485,15 @@ function updateClouds() {
     let c = clouds[i];
     c.x += c.vx;
 
-    let buffer = 400 * c.s; // 구름 크기별 버퍼
+    let cloudWidth = 400 * c.s; // 구름 하나의 대략적인 너비
 
-    // 오른쪽으로 나가면 왼쪽으로 순간 이동
-    if (c.x - buffer > width) {
-      c.x = -buffer;
+    // 오른쪽 끝으로 넘어가면 왼쪽으로
+    if (c.x - cloudWidth * 0.5 > width) {
+      c.x = -cloudWidth * 0.5;
     }
-
-    // 왼쪽으로 나가면 오른쪽으로 순간 이동
-    else if (c.x + buffer < 0) {
-      c.x = width + buffer;
+    // 왼쪽 끝으로 넘어가면 오른쪽으로
+    else if (c.x + cloudWidth * 0.5 < 0) {
+      c.x = width + cloudWidth * 0.5;
     }
   }
 }
