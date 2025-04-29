@@ -727,6 +727,7 @@ class Sun {
 class Moon {
   constructor(pos) {
     this.pos = pos.copy();
+    this.shapeIndex = moonShapeIndex; // ⭐️ shape 저장
   }
 
   draw() {
@@ -737,24 +738,62 @@ class Moon {
     noStroke();
 
     drawingContext.save();
-    drawingContext.filter = "blur(80px)";
+    drawingContext.filter = "blur(60px)";
     fill(200, 220, 255, 160);
-    ellipse(0, 0, 500, 500);
+
+    beginShape();
+    if (this.shapeIndex === 0) {
+      // 초승달 모양
+      vertex(198, 0);
+      vertex(198, 395);
+      bezierVertex(198, 395, 197.667, 395, 197.5, 395);
+      bezierVertex(88.4238, 395, 0, 306.576, 0, 197.5);
+      bezierVertex(0, 88.4238, 88.4238, 0, 197.5, 0);
+      bezierVertex(197.667, 0, 198, 0, 198, 0);
+    } else if (this.shapeIndex === 1) {
+      // 반달 모양
+      vertex(221, 0);
+      bezierVertex(258.685, 0, 294.167, 9.4327, 325.214, 26.0654);
+      bezierVertex(312.226, 23.4, 298.776, 22, 285, 22);
+      bezierVertex(175.095, 22, 86, 111.095, 86, 221);
+      bezierVertex(86, 330.905, 175.095, 420, 285, 420);
+      bezierVertex(298.777, 420, 312.226, 418.599, 325.214, 415.934);
+      bezierVertex(294.167, 432.566, 258.685, 442, 221, 442);
+      bezierVertex(98.9451, 442, 0, 343.055, 0, 221);
+      bezierVertex(0, 98.9451, 98.9451, 0, 221, 0);
+    } else {
+      // 보름달 (완전 원)
+      ellipse(0, 0, 500, 500);
+    }
+    endShape(CLOSE);
+
     drawingContext.restore();
 
+    // 🌕 본체
     fill(245, 245, 255, 240);
-    ellipse(0, 0, 500, 500);
-
-    let detail = 4;
-    for (let x = -250; x < 250; x += detail) {
-      for (let y = -250; y < 250; y += detail) {
-        if (dist(0, 0, x, y) < 250) {
-          let n = noise((x + frameCount * 0.1) * 0.01, (y + frameCount * 0.1) * 0.01);
-          let bright = map(n, 0, 1, 220, 255);
-          fill(bright, bright, 255, 8);
-          ellipse(x, y, detail * 1.2);
-        }
+    if (this.shapeIndex < 2) {
+      beginShape();
+      if (this.shapeIndex === 0) {
+        vertex(198, 0);
+        vertex(198, 395);
+        bezierVertex(198, 395, 197.667, 395, 197.5, 395);
+        bezierVertex(88.4238, 395, 0, 306.576, 0, 197.5);
+        bezierVertex(0, 88.4238, 88.4238, 0, 197.5, 0);
+        bezierVertex(197.667, 0, 198, 0, 198, 0);
+      } else if (this.shapeIndex === 1) {
+        vertex(221, 0);
+        bezierVertex(258.685, 0, 294.167, 9.4327, 325.214, 26.0654);
+        bezierVertex(312.226, 23.4, 298.776, 22, 285, 22);
+        bezierVertex(175.095, 22, 86, 111.095, 86, 221);
+        bezierVertex(86, 330.905, 175.095, 420, 285, 420);
+        bezierVertex(298.777, 420, 312.226, 418.599, 325.214, 415.934);
+        bezierVertex(294.167, 432.566, 258.685, 442, 221, 442);
+        bezierVertex(98.9451, 442, 0, 343.055, 0, 221);
+        bezierVertex(0, 98.9451, 98.9451, 0, 221, 0);
       }
+      endShape(CLOSE);
+    } else {
+      ellipse(0, 0, 500, 500);
     }
 
     pop();
@@ -844,16 +883,17 @@ class BubbleManager {
   }
 }
 function drawSunOrMoon() {
-  if (["night", "twilight", "stormy", "blush","rainyNight"].includes(timeOfDay)) {
+  if (["night", "twilight", "stormy", "blush", "rainyNight"].includes(timeOfDay)) {
     if (moon) {
-      moon.draw(); // moon이 있을 때만 그리기
+      moon.draw(); // 밤이면 랜덤 달 모양 그리기
     }
   } else {
     if (sun) {
-      sun.draw();
+      sun.draw(); // 낮이면 해 그리기
     }
   }
 }
+
 
 function drawOcean() {
   drawWaveParticles();
